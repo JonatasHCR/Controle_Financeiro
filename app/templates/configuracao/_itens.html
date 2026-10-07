@@ -1,5 +1,5 @@
 <div class="tbl-wrap" style="max-height:520px"><table>
-  <thead><tr><th>Código</th><th>Descrição</th><th>Unid.</th><th class="r">Qtd.</th><th class="r">Custo-alvo</th><th class="r">Custo-alvo projetado</th><th class="r">Qtd. medida</th><th>Remover</th></tr></thead>
+  <thead><tr><th>Código</th><th>Descrição</th><th>Unid.</th><th class="r">Qtd.</th><th class="r">Custo-alvo</th><th class="r">Custo-alvo projetado</th><th class="r">Qtd. medida</th><th>Naturezas ligadas</th><th>Remover</th></tr></thead>
   <tbody>
     {% for it in itens %}
       <tr>
@@ -10,6 +10,7 @@
         <td style="width:140px"><input class="in r" name="it-{{ loop.index0 }}-custo_alvo" value="{{ it.custo_alvo | numero_br }}" inputmode="decimal"></td>
         <td style="width:140px"><input class="in r" name="it-{{ loop.index0 }}-custo_alvo_projetado" value="{{ it.custo_alvo_projetado | numero_br }}" placeholder="= custo-alvo" inputmode="decimal"></td>
         <td style="width:100px"><input class="in r" name="it-{{ loop.index0 }}-quantidade_medida" value="{{ it.quantidade_medida | numero_br }}" inputmode="decimal"></td>
+        <td class="ligadas">{% for nome in ligadas.get(it.codigo, []) %}<span class="pill">{{ nome }}</span> {% else %}<span class="note">nenhuma</span>{% endfor %}</td>
         <td><input type="checkbox" name="it-{{ loop.index0 }}-remover" aria-label="Remover {{ it.codigo }}"></td>
       </tr>
     {% endfor %}
@@ -23,10 +24,11 @@
         <td><input class="in r" name="it-{{ n }}-custo_alvo_projetado" inputmode="decimal"></td>
         <td><input class="in r" name="it-{{ n }}-quantidade_medida" inputmode="decimal"></td>
         <td></td>
+        <td></td>
       </tr>
     {% endfor %}
   </tbody>
-  <tfoot><tr><td colspan="4">Total</td><td class="r">{{ soma_itens | moeda }}</td><td colspan="3"></td></tr></tfoot>
+  <tfoot><tr><td colspan="4">Total</td><td class="r">{{ soma_itens | moeda }}</td><td colspan="4"></td></tr></tfoot>
 </table></div>
 <div class="cfg-bar">
   <span class="note">Custo-alvo contratual (valor × (1 − tributos) ÷ (1 + taxa adm.)): <b>{{ alvo_contratual | moeda }}</b> ·

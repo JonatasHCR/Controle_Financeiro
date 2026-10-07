@@ -34,7 +34,11 @@
   function corHex(i) { return css('--c' + ((i % 8) + 1)); }
   var semAcento = function (t) { return t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
   function origemTag(c) { return !c.receita ? ['warn', 'sem receita'] : !c.despesa ? ['info', 'sem despesa'] : null; }
-  function tagHtml(c) { var t = origemTag(c); return t ? ' <span class="pill ' + t[0] + '">' + t[1] + '</span>' : ''; }
+  function tagHtml(c) {
+    var t = origemTag(c);
+    return (t ? ' <span class="pill ' + t[0] + '">' + t[1] + '</span>' : '') +
+      (c.ativo === false ? ' <span class="pill">desativado</span>' : '');
+  }
 
   // ---------- estado e URL ----------
   var st = { cli: [], coord: [], cr: [], modo: 'todas', mes: '', de: '', ate: '', nf: 'all' };

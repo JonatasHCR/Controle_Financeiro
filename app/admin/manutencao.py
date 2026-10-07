@@ -62,7 +62,9 @@ def listar_backups() -> list[dict]:
                 "nome": arquivo.name,
                 "bytes": info.st_size,
                 "criado_em": datetime.fromtimestamp(info.st_mtime),
-                "origem": "manual" if arquivo.name.startswith("controle_financeiro_manual_") else "automático",
+                "origem": "manual"
+                if arquivo.name.startswith("controle_financeiro_manual_")
+                else "automático",
             }
         )
     return sorted(arquivos, key=lambda item: item["criado_em"], reverse=True)

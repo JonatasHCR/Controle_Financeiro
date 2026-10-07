@@ -108,6 +108,7 @@ def _contratos(session, cliente) -> int:
                 "participacao": _dec(c.get("participation")),
                 "data_inicio": _data(c.get("start_date")),
                 "data_fim": _data(c.get("end_date")),
+                "ativo": c.get("active", True) is not False,
                 "origem_atualizado_em": _instante(c.get("updated_at")),
             }
             for c in itens

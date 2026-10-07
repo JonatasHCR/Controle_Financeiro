@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
+from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
 
@@ -82,8 +83,13 @@ def _dados_da_aba(contrato, aba: str) -> dict:
         itens = sessao.scalars(
             select(CfgItem).where(CfgItem.cr_norm == cr).order_by(CfgItem.ordem, CfgItem.id)
         ).all()
+        ligadas = defaultdict(list)
+        for n in naturezas_do_cr(sessao, cr):
+            if n["item"]:
+                ligadas[n["item"]].append(n["nome"])
         return {
             "itens": itens,
+            "ligadas": ligadas,
             "alvo_contratual": alvo_contratual(contrato),
             "soma_itens": float(sum((i.custo_alvo or 0) for i in itens)),
         }

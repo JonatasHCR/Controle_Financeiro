@@ -1,5 +1,5 @@
-"""Leitura do banco para o painel: contratos (união Receita + Controle) e os
-lançamentos dos CRs escolhidos, já agregados no SQL."""
+"""Leitura do banco para o painel: os contratos da Receita e os lançamentos
+dos CRs escolhidos, já agregados no SQL."""
 
 from __future__ import annotations
 
@@ -33,6 +33,8 @@ from app.models import (
 )
 
 NAO_CLASSIFICADO = "NC"
+# Natureza sem ligação vira item com o próprio nome: "nat:LOCAÇÃO DE VEÍCULOS".
+PREFIXO_NATUREZA = "nat:"
 
 
 @dataclass
@@ -45,6 +47,7 @@ class Contrato:
     coordenadores: list[str] = field(default_factory=list)
     receita: bool = True
     despesa: bool = True
+    ativo: bool = True
     origem_id: int | None = None
     valor: float = 0.0
     valor_inicial: float = 0.0
@@ -92,7 +95,7 @@ def _parametros(session) -> dict[str, tuple[float, float]]:
 
 
 def carregar_contratos(session) -> list[Contrato]:
-    """Todos os CRs: os da Receita e os que só existem no Controle."""
+    """Os contratos da Receita. CR que só existe no Controle não entra."""
     clientes = {c.origem_id: c.nome for c in session.scalars(select(RcCliente))}
     coords = defaultdict(list)
     for linha in session.scalars(select(RcContratoCoordenador).order_by(RcContratoCoordenador.id)):
@@ -128,6 +131,7 @@ def carregar_contratos(session) -> list[Contrato]:
                 coordenadores=coords.get(rc.origem_id, []),
                 receita=True,
                 despesa=rc.cr_norm in centros,
+                ativo=rc.ativo,
                 origem_id=rc.origem_id,
                 valor=valor,
                 valor_inicial=_f(iniciais.get(rc.origem_id, rc.valor)),
@@ -139,22 +143,6 @@ def carregar_contratos(session) -> list[Contrato]:
                 taxa_adm=taxa,
             )
         )
-    for cr, centro in centros.items():
-        if cr in vistos:
-            continue
-        trib, taxa = params.get(cr, params["*"])
-        contratos.append(
-            Contrato(
-                cr=cr,
-                nome=centro.nome or cr,
-                descricao=centro.nome or cr,
-                receita=False,
-                despesa=True,
-                tributos=trib,
-                taxa_adm=taxa,
-            )
-        )
-
     contratos.sort(key=lambda c: (len(c.cr), c.cr))
     for i, c in enumerate(contratos):
         c.cor = i % 8
@@ -240,6 +228,7 @@ def carregar_lancamentos(session, contratos: list[Contrato]) -> Lancamentos:
             CdCentro.cr_norm,
             CdDespesa.data_baixa,
             CdNatureza.nome_norm,
+            func.min(CdNatureza.nome),
             func.sum(func.coalesce(CdDespesa.valor_baixado, 0)),
         )
         .join(CdCentro, CdCentro.origem_id == CdDespesa.centro_origem_id)
@@ -247,8 +236,9 @@ def carregar_lancamentos(session, contratos: list[Contrato]) -> Lancamentos:
         .where(CdCentro.cr_norm.in_(crs))
         .group_by(CdCentro.cr_norm, CdDespesa.data_baixa, CdNatureza.nome_norm)
     ).all()
-    for cr, data_baixa, natureza, valor in linhas:
-        item = depara[cr].get(natureza) or NAO_CLASSIFICADO
+    for cr, data_baixa, natureza, nome, valor in linhas:
+        # Sem ligação na configuração, o item é a própria natureza.
+        item = depara[cr].get(natureza) or PREFIXO_NATUREZA + nome
         custos.append((cr, data_baixa, item, _f(valor)))
 
     itens = defaultdict(list)
