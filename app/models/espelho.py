@@ -9,7 +9,17 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, Index, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.extensions import db
@@ -49,6 +59,8 @@ class RcContrato(_Espelho, db.Model):
     participacao: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     data_inicio: Mapped[date | None] = mapped_column(Date)
     data_fim: Mapped[date | None] = mapped_column(Date)
+    # Desativado na Receita: continua aqui, mas não recebe mais lançamento lá.
+    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
 
 class RcContratoCoordenador(db.Model):

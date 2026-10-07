@@ -29,11 +29,12 @@ def test_leitor_nao_entra(entrar, leitor, carregado):
     assert entrar(leitor).get("/configuracao/").status_code == 403
 
 
-def test_lista_mostra_a_uniao_e_as_marcas(entrar, operador, carregado):
+def test_lista_mostra_os_contratos_da_receita(entrar, operador, carregado):
     corpo = entrar(operador).get("/configuracao/").get_data(as_text=True)
-    for cr in ("4561", "4602", "4655", "4660"):
+    for cr in ("4561", "4602", "4660"):
         assert cr in corpo
-    assert "sem contrato na Receita" in corpo and "sem despesa" in corpo
+    assert "sem despesa" in corpo
+    assert "4655" not in corpo
 
 
 def test_nenhuma_rota_cria_contrato(app):
@@ -99,15 +100,21 @@ def test_depara(entrar, operador, carregado, db):
     assert linha.item_codigo == ""
 
 
-def test_cr_so_do_controle_aceita_so_depara(entrar, operador, carregado, db):
-    cliente = entrar(operador)
-    assert "só o de-para" in cliente.post(
-        "/configuracao/4655/itens", data={}, follow_redirects=True
-    ).get_data(as_text=True)
-    cliente.post(
+def test_cr_so_do_controle_nao_tem_configuracao(entrar, operador, carregado):
+    resposta = entrar(operador).post(
         "/configuracao/4655/depara", data={"dp-0-natureza": "LOCACAO DE VEICULOS", "dp-0-item": ""}
     )
-    assert db.session.scalars(select(DeparaItem).where(DeparaItem.cr_norm == "4655")).one()
+    assert resposta.status_code == 404
+
+
+def test_itens_mostram_as_naturezas_ligadas(entrar, operador, carregado):
+    corpo = entrar(operador).get("/configuracao/?cr=4561&aba=itens").get_data(as_text=True)
+    assert "Naturezas ligadas" in corpo
+
+
+def test_depara_tem_a_propria_natureza_como_padrao(entrar, operador, carregado):
+    corpo = entrar(operador).get("/configuracao/?cr=4602&aba=depara").get_data(as_text=True)
+    assert "a própria natureza (padrão)" in corpo
 
 
 def test_bms(entrar, operador, carregado, db):
@@ -244,18 +251,18 @@ def test_erros_por_linha_barram_a_confirmacao(entrar, operador, carregado):
             }
         ),
     )
-    assert "Itens, linha 2" in corpo and "CR 9999 não existe" in corpo
+    assert "Itens, linha 2" in corpo and "CR 9999 não tem contrato" in corpo
     assert (
         "disabled>Confirmar importação" in corpo
         or "disabled" in corpo.split("Confirmar importação")[0][-80:]
     )
 
 
-def test_cr_so_do_controle_na_planilha_so_depara(entrar, operador, carregado):
+def test_cr_so_do_controle_na_planilha_e_recusado(entrar, operador, carregado):
     corpo = _importar(
         entrar(operador), _planilha({"Itens": [["4655", "1.1", "x", None, None, 10, None, None]]})
     )
-    assert "só existe no Controle de Despesa" in corpo
+    assert "não tem contrato na Receita" in corpo
 
 
 def test_nf_que_nao_existe_vira_aviso(entrar, operador, carregado):

@@ -5,10 +5,12 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from sqlalchemy import select
 from werkzeug.datastructures import MultiDict
 
 from app.analise.painel import montar_painel
 from app.analise.periodo import Filtro
+from app.models import CfgItem
 
 pytestmark = pytest.mark.integration
 
@@ -29,23 +31,28 @@ def test_cascata_todas_as_datas(carregado):
     assert k["trib"] == pytest.approx(70_000)
     assert k["liq"] == pytest.approx(280_000)
     assert k["alvo_at"] == pytest.approx(280_000 / 1.15)
-    assert k["cus"] == pytest.approx(115_000)
-    assert k["res"] == pytest.approx(280_000 / 1.15 - 115_000)
+    assert k["cus"] == pytest.approx(110_000)
+    assert k["res"] == pytest.approx(280_000 / 1.15 - 110_000)
 
 
-def test_universo_e_a_uniao_das_duas_origens(carregado):
+def test_universo_sao_os_contratos_da_receita(carregado):
     crs = [c["cr"] for c in painel(carregado)["contratos"]]
-    assert crs == ["4561", "4602", "4655", "4660"]
+    assert crs == ["4561", "4602", "4660"]
 
 
-def test_cr_so_no_controle_entra_com_receita_zero(carregado):
+def test_cr_so_no_controle_fica_fora(carregado):
     d = painel(carregado, cr="4655")
-    assert d["cascata"]["fat"] == 0
-    assert d["cascata"]["cus"] == pytest.approx(5_000)
-    assert d["cascata"]["res"] == pytest.approx(-5_000)
-    assert d["sem_receita"] == ["4655"]
-    assert d["execucao"] == []  # sem valor nem prazo
-    assert d["custo_alvo"]["mk_c"] is None  # divisão por zero vira "—"
+    assert "4655" not in [c["cr"] for c in d.get("contratos", [])]
+
+
+def test_contrato_desativado_continua_e_vem_marcado(carregado, db):
+    from app.models import RcContrato
+
+    contrato = db.session.scalars(select(RcContrato).where(RcContrato.cr_norm == "4602")).one()
+    contrato.ativo = False
+    db.session.commit()
+    resumo = {c["cr"]: c for c in painel(carregado)["contratos"]}
+    assert resumo["4602"]["ativo"] is False and resumo["4561"]["ativo"] is True
 
 
 def test_cr_so_na_receita_entra_com_custo_zero(carregado):
@@ -76,9 +83,7 @@ def test_acumulado_ate(carregado):
 def test_intervalo_de_data_a_data(carregado):
     k = painel(carregado, modo="intervalo", de="2026-02-11", ate="2026-03-10")["cascata"]
     assert k["fat"] == pytest.approx(150_000)  # 801 (15/02) + 703 (10/03)
-    assert k["cus"] == pytest.approx(
-        65_000
-    )  # 15/02 (40 mil) + 20/02 (20 mil) + 05/03 (5 mil, 4655)
+    assert k["cus"] == pytest.approx(60_000)  # 15/02 (40 mil) + 20/02 (20 mil)
 
 
 def test_filtros_multiplos_ou_dentro_e_entre(carregado):
@@ -126,9 +131,24 @@ def test_itens_e_desvio_usam_o_depara(carregado):
     assert {x["codigo"] for x in d["desvios"]} <= {"1.1", "1.2"}
 
 
-def test_custo_sem_depara_vai_para_nao_classificado(carregado):
+def test_natureza_sem_ligacao_vira_item_com_o_proprio_nome(carregado):
     d = painel(carregado, cr="4602")
-    assert [i["d"] for i in d["itens"]] == ["Não classificado"]
+    assert "Não classificado" not in [i["d"] for i in d["itens"]]
+    assert all(i["v"] > 0 for i in d["itens"])
+    # sem custo-alvo, não entra no gráfico de desvio
+    assert d["desvios"] == []
+
+
+def test_varias_naturezas_no_mesmo_item_somam(carregado, db):
+    from app.models import CdNatureza, DeparaItem
+
+    naturezas = db.session.scalars(select(CdNatureza.nome_norm)).all()
+    for natureza in naturezas:
+        db.session.merge(DeparaItem(cr_norm="4602", natureza_nome_norm=natureza, item_codigo="9.9"))
+    db.session.add(CfgItem(cr_norm="4602", codigo="9.9", descricao="Tudo junto", custo_alvo=1))
+    db.session.commit()
+    d = painel(carregado, cr="4602")
+    assert [i["d"] for i in d["itens"]] == ["Tudo junto"]
 
 
 def test_pendencias_so_abertas_e_pleitos(carregado):
@@ -153,7 +173,7 @@ def test_coordenador_leitor_ve_so_os_proprios(carregado, leitor, db):
 def test_operador_ve_todos(carregado, operador, db):
     operador.nome = "Carlos Menezes"
     db.session.commit()
-    assert len(painel(carregado, usuario=operador)["contratos"]) == 4
+    assert len(painel(carregado, usuario=operador)["contratos"]) == 3
 
 
 # --- rotas ------------------------------------------------------------------

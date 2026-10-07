@@ -74,7 +74,10 @@ select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);bo
 .seg button[aria-pressed=true]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .seg button:disabled{opacity:.45;cursor:default}
 .link{font:inherit;font-size:13px;border:0;background:none;color:var(--accent);cursor:pointer;padding:0;text-align:left;font-weight:600}
-.legenda-c{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line);padding-top:12px}
+.lista-c{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:12px;min-height:0}
+.lista-c-n{font-weight:400;text-transform:none;letter-spacing:0}
+.legenda-c{display:flex;flex-direction:column;gap:2px;max-height:min(360px,calc(100vh - 520px));min-height:140px;overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:8px;padding:4px}
+.legenda-c button[hidden]{display:none}
 .legenda-c button{display:flex;gap:8px;align-items:center;font:inherit;font-size:12.5px;border:0;background:none;color:var(--ink-2);padding:5px 6px;border-radius:6px;cursor:pointer;text-align:left}
 .legenda-c button:hover{background:var(--surface)}
 .legenda-c button[aria-pressed=true]{background:var(--surface);color:var(--ink);font-weight:600}
@@ -94,7 +97,7 @@ select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);bo
 .ms .lista small{display:block;color:var(--ink-3);font-size:12px}
 .ms .rod{display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:4px;padding:6px 4px 2px}
 .ms .rod button{font:inherit;font-size:12.5px;border:0;background:none;color:var(--accent);cursor:pointer;padding:2px 4px;font-weight:600}
-@media (max-width:960px){.app{grid-template-columns:minmax(0,1fr)}.filtros{position:static;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end}.filtros h2,.legenda-c{grid-column:1/-1}.legenda-c{flex-direction:row;flex-wrap:wrap}}
+@media (max-width:960px){.app{grid-template-columns:minmax(0,1fr)}.filtros{position:static;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end}.filtros h2,.lista-c{grid-column:1/-1}.legenda-c{max-height:260px}}
 
 /* conteúdo */
 main{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;min-width:0}

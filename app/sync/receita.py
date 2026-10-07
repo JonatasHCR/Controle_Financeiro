@@ -108,6 +108,7 @@ def _contratos(session, cliente) -> int:
                 "participacao": _dec(c.get("participation")),
                 "data_inicio": _data(c.get("start_date")),
                 "data_fim": _data(c.get("end_date")),
+                "ativo": c.get("active", True) is not False,
                 "origem_atualizado_em": _instante(c.get("updated_at")),
             }
             for c in itens
@@ -225,11 +226,13 @@ def _incremental(session, cliente, recurso: str, modelo, conversor, completo: bo
 def _exclusoes(session, cliente) -> int:
     registro = marca(session, FONTE, "deletions")
     total, nova = 0, registro.marca_exclusoes
+    desde = registro.marca_exclusoes - SOBREPOSICAO if registro.marca_exclusoes else None
     for pagina, watermark in cliente.paginar(
         "deletions",
         "deletions",
+        marca="since",
         types="Invoice,Receipt",
-        since=registro.marca_exclusoes.isoformat() if registro.marca_exclusoes else None,
+        since=desde.isoformat() if desde else None,
     ):
         nfs = [d["item_id"] for d in pagina if d["item_type"] == "Invoice"]
         recebimentos = [d["item_id"] for d in pagina if d["item_type"] == "Receipt"]
@@ -261,8 +264,14 @@ def sincronizar(session, cliente, completo: bool = False) -> dict:
         ("invoices", RcNf, "invoices"),
         ("receipts", RcRecebimento, "receipts"),
     ):
+        resumo = status.get(chave, {})
         local = session.scalar(select(func.count()).select_from(modelo))
-        if local != status.get(chave, {}).get("count"):
+        # A soma pega o valor alterado que a quantidade não vê.
+        soma_local = session.scalar(select(func.coalesce(func.sum(modelo.valor), 0)))
+        soma_diverge = resumo.get("sum") is not None and Decimal(str(soma_local)) != Decimal(
+            str(resumo["sum"])
+        )
+        if local != resumo.get("count") or soma_diverge:
             divergiu.append(recurso)
     if divergiu and not completo:
         for recurso, modelo, conversor in (

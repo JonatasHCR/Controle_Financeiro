@@ -12,6 +12,7 @@ from datetime import date
 
 from app.analise.dados import (
     NAO_CLASSIFICADO,
+    PREFIXO_NATUREZA,
     Contrato,
     base_maxima,
     carregar_contratos,
@@ -120,24 +121,35 @@ def _item_calc(
                 "desv": alvo_proj - proj,
             }
         )
-    # custo sem item (sem de-para ou sem itens cadastrados): sem alvo, todo ele é estouro
-    sobra = sum(v for cod, v in real_por_item.items() if cod not in codigos)
-    if sobra:
-        ritmo = sobra / max(1, meses_corridos)
-        proj = sobra if c.status == "CONCLUÍDO" else sobra + ritmo * meses_restantes
+    # Natureza sem ligação é item próprio, sem custo-alvo; código de item que
+    # sumiu da configuração aparece com o código, para alguém religar.
+    for cod, real in sorted(real_por_item.items(), key=lambda par: -par[1]):
+        if cod in codigos or not real:
+            continue
+        ritmo = real / max(1, meses_corridos)
+        proj = real if c.status == "CONCLUÍDO" else real + ritmo * meses_restantes
         linhas.append(
             {
                 "cr": c.cr,
-                "codigo": NAO_CLASSIFICADO,
-                "d": "Não classificado",
+                "codigo": cod,
+                "d": nome_do_item(cod),
                 "alvo": 0.0,
                 "alvo_u": 0.0,
-                "real": sobra,
+                "real": real,
                 "proj": proj,
                 "desv": -proj,
+                "sem_alvo": True,
             }
         )
     return linhas
+
+
+def nome_do_item(codigo: str) -> str:
+    if codigo.startswith(PREFIXO_NATUREZA):
+        return codigo[len(PREFIXO_NATUREZA) :]
+    if codigo == NAO_CLASSIFICADO:
+        return "Não classificado"
+    return f"{codigo} (item não cadastrado)"
 
 
 def _ritmo(gap: float) -> tuple[str, str]:
@@ -168,6 +180,7 @@ def _resumo(c: Contrato) -> dict:
         "cor": c.cor,
         "receita": c.receita,
         "despesa": c.despesa,
+        "ativo": c.ativo,
     }
 
 
@@ -385,9 +398,7 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
         (
             {
                 "cr": cr,
-                "d": nomes_item.get(
-                    (cr, item), "Não classificado" if item == NAO_CLASSIFICADO else item
-                ),
+                "d": nomes_item.get((cr, item), nome_do_item(item)),
                 "v": v,
                 "cor": por_cr[cr].cor,
             }
@@ -397,7 +408,9 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
         key=lambda x: -x["v"],
     )[:10]
     desvios = sorted(
-        (i for i in todos_itens if abs(i["desv"]) > 0.5), key=lambda i: -abs(i["desv"])
+        # Item sem custo-alvo (natureza sem ligação) não tem desvio a comparar.
+        (i for i in todos_itens if abs(i["desv"]) > 0.5 and not i.get("sem_alvo")),
+        key=lambda i: -abs(i["desv"]),
     )[:10]
     desvios.sort(key=lambda i: -i["desv"])
 

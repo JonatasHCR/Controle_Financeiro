@@ -300,10 +300,7 @@ def aplicar(session, caminho: Path, usuario_id: int | None, simular: bool) -> Re
                 continue
             c = contratos.get(cr)
             if c is None:
-                r.erros.append(
-                    f"{aba}, linha {numero}: CR {cr} não existe na Receita"
-                    " nem no Controle de Despesa"
-                )
+                r.erros.append(f"{aba}, linha {numero}: CR {cr} não tem contrato na Receita")
                 continue
             if not c.receita and aba != "De-para":
                 r.erros.append(
