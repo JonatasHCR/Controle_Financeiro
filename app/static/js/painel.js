@@ -486,6 +486,9 @@
       .map(function (x) { return '<dt>' + x[0] + '</dt><dd>' + esc(x[1]) + '</dd>'; }).join('');
     if (vazio) { window.__graficosProntos = true; return; }
     ficha(); cascata(); receb(); mensal(); custoAlvo(); execucao(); itens(); prazos(); tabelas();
+    // Quadro mais alto que a folha (A4 paisagem ≈ 700px úteis) quebra entre páginas,
+    // em vez de pular inteiro e deixar a página anterior em branco.
+    if (CFG.impressao) document.querySelectorAll('main > section.card').forEach(function (s) { s.classList.toggle('longo', s.offsetHeight > 700); });
     window.__graficosProntos = true;
   }
   render();
