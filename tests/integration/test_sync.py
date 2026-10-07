@@ -1,0 +1,292 @@
+"""Sincronização com a Receita e o Controle de Despesa (APIs simuladas)."""
+
+from __future__ import annotations
+
+import re
+
+import pytest
+import responses
+from sqlalchemy import func, select
+
+from app.models import CdDespesa, RcContrato, RcContratoCoordenador, RcNf, RcPrevisao, SyncExecucao
+from app.sync.executor import sincronizar
+
+pytestmark = pytest.mark.integration
+
+RECEITA = "http://receita.teste/api/v1"
+CONTROLE = "http://controle.teste/api/v1"
+
+
+@pytest.fixture
+def origens(app, db):
+    app.config.update(
+        RECEITA_API_URL=RECEITA,
+        RECEITA_API_TOKEN="t1",
+        CONTROLE_API_URL=CONTROLE,
+        CONTROLE_API_TOKEN="t2",
+        SYNC_HORA_COMPLETA=0,
+    )
+    estado = {
+        "clients": [{"id": 1, "name": "Prefeitura", "full_name": "Prefeitura Municipal"}],
+        "cost_centers": [
+            {
+                "id": 1,
+                "cr_code": "04561",
+                "description": "Adutor",
+                "contract_number": "1/24",
+                "coordinator": "Ana / Bia",
+                "coordinator_list": ["Ana", "Bia"],
+                "start_date": "2025-01-01",
+                "end_date": "2026-12-31",
+                "value": "1000.00",
+                "participation": "1.0",
+                "client_id": 1,
+                "updated_at": "2026-01-01T00:00:00Z",
+            }
+        ],
+        "invoices": [
+            {
+                "id": 1,
+                "cost_center_id": 1,
+                "number": "10",
+                "issued_at": "2026-01-10",
+                "kind": "principal",
+                "value": "100.50",
+                "updated_at": "2026-01-10T10:00:00Z",
+            }
+        ],
+        "receipts": [],
+        "adjustments": [],
+        "forecast_entries": [
+            {
+                "id": 1,
+                "cost_center_id": 1,
+                "month_year": "JUNHO/2026",
+                "forecasted_total": "50.0",
+                "updated_at": "2026-01-01T00:00:00Z",
+            }
+        ],
+        "deletions": [],
+        "despesas": [
+            {
+                "id": 1,
+                "centro_custo_id": 9,
+                "fornecedor_id": 1,
+                "natureza_id": 1,
+                "data_baixa": "2026-01-15",
+                "valor_original": "10.00",
+                "valor_baixado": "10.00",
+                "atualizado_em": "2026-01-15T00:00:00+00:00",
+            },
+            {
+                "id": 2,
+                "centro_custo_id": 9,
+                "fornecedor_id": 1,
+                "natureza_id": 1,
+                "data_baixa": "2026-01-16",
+                "valor_original": "5.00",
+                "valor_baixado": "5.00",
+                "atualizado_em": "2026-01-16T00:00:00+00:00",
+            },
+        ],
+        "exclusoes": [],
+        "chamadas": [],
+        "falhar_controle": False,
+    }
+
+    def lista(chave):
+        def resposta(req):
+            estado["chamadas"].append(req.url)
+            itens = estado[chave]
+            ultimo = itens[-1] if itens else {}
+            marca = next(
+                (
+                    ultimo[k]
+                    for k in ("updated_at", "atualizado_em", "deleted_at", "excluida_em")
+                    if k in ultimo
+                ),
+                None,
+            )
+            return (
+                200,
+                {},
+                _json({chave: itens, "watermark": marca, "count": len(itens), "has_more": False}),
+            )
+
+        return resposta
+
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as mock:
+        for recurso in (
+            "clients",
+            "cost_centers",
+            "invoices",
+            "receipts",
+            "adjustments",
+            "forecast_entries",
+            "deletions",
+        ):
+            mock.add_callback(
+                responses.GET, re.compile(rf"{RECEITA}/{recurso}(\?.*)?$"), callback=lista(recurso)
+            )
+        mock.add_callback(
+            responses.GET,
+            re.compile(rf"{RECEITA}/status$"),
+            callback=lambda req: (
+                200,
+                {},
+                _json(
+                    {
+                        "invoices": {"count": len(estado["invoices"])},
+                        "receipts": {"count": len(estado["receipts"])},
+                    }
+                ),
+            ),
+        )
+
+        def controle(chave):
+            def resposta(req):
+                if estado["falhar_controle"]:
+                    return 500, {}, "erro"
+                return lista(chave)(req)
+
+            return resposta
+
+        mock.add_callback(
+            responses.GET,
+            re.compile(rf"{CONTROLE}/despesas(\?.*)?$"),
+            callback=controle("despesas"),
+        )
+        mock.add_callback(
+            responses.GET,
+            re.compile(rf"{CONTROLE}/despesas/exclusoes(\?.*)?$"),
+            callback=controle("exclusoes"),
+        )
+        mock.add_callback(
+            responses.GET,
+            re.compile(rf"{CONTROLE}/despesas/ids$"),
+            callback=lambda req: (200, {}, _json({"ids": [d["id"] for d in estado["despesas"]]})),
+        )
+        mock.add(
+            responses.GET,
+            f"{CONTROLE}/centros_custo",
+            json={"centros_custo": [{"id": 9, "codigo": "4561", "nome": "Adutor", "ativo": True}]},
+        )
+        mock.add(
+            responses.GET,
+            f"{CONTROLE}/fornecedores",
+            json={"fornecedores": [{"id": 1, "nome": "F", "ativo": True}]},
+        )
+        mock.add(
+            responses.GET,
+            f"{CONTROLE}/naturezas",
+            json={"naturezas": [{"id": 1, "nome": "Locação de veículos", "ativo": True}]},
+        )
+        mock.add_callback(
+            responses.GET,
+            re.compile(rf"{CONTROLE}/status$"),
+            callback=lambda req: (200, {}, _json({"despesas": {"count": len(estado["despesas"])}})),
+        )
+        yield estado
+
+
+def _json(valor) -> str:
+    import json
+
+    return json.dumps(valor)
+
+
+def _contar(db, modelo) -> int:
+    return db.session.scalar(select(func.count()).select_from(modelo))
+
+
+def test_primeira_carga(origens, db):
+    execucao = sincronizar(disparo="manual")
+    assert execucao.status == "ok"
+    contrato = db.session.scalars(select(RcContrato)).one()
+    assert (contrato.cr_code, contrato.cr_norm, float(contrato.valor)) == ("04561", "4561", 1000.0)
+    assert {c.nome for c in db.session.scalars(select(RcContratoCoordenador))} == {"Ana", "Bia"}
+    assert float(db.session.scalars(select(RcNf)).one().valor) == 100.50
+    assert str(db.session.scalars(select(RcPrevisao)).one().competencia) == "2026-06-01"
+    assert _contar(db, CdDespesa) == 2
+
+
+def test_segunda_rodada_nao_duplica(origens, db):
+    sincronizar()
+    sincronizar()
+    assert _contar(db, RcNf) == 1 and _contar(db, CdDespesa) == 2
+
+
+def test_exclusao_no_controle_some_aqui(origens, db):
+    sincronizar()
+    origens["despesas"] = origens["despesas"][:1]
+    origens["exclusoes"] = [{"id": 2, "excluida_em": "2026-02-01T00:00:00+00:00"}]
+    sincronizar()
+    assert _contar(db, CdDespesa) == 1
+
+
+def test_reconciliacao_pega_exclusao_sem_rastro(origens, db):
+    """Restauração de backup no Controle: some sem passar pela trigger."""
+    sincronizar()
+    origens["despesas"] = origens["despesas"][:1]
+    sincronizar()
+    assert _contar(db, CdDespesa) == 1
+
+
+def test_nf_apagada_na_receita_some_aqui(origens, db):
+    sincronizar()
+    origens["invoices"] = []
+    origens["deletions"] = [
+        {"item_type": "Invoice", "item_id": 1, "deleted_at": "2026-02-01T00:00:00Z"}
+    ]
+    sincronizar()
+    assert _contar(db, RcNf) == 0
+
+
+def test_contrato_apagado_na_receita_some_na_recarga(origens, db):
+    sincronizar()
+    origens["cost_centers"] = []
+    sincronizar()
+    assert _contar(db, RcContrato) == 0
+
+
+def test_uma_origem_fora_do_ar_nao_derruba_a_outra(origens, db):
+    origens["falhar_controle"] = True
+    execucao = sincronizar()
+    assert execucao.status == "parcial"
+    assert "controle" in execucao.erro
+    assert _contar(db, RcNf) == 1 and _contar(db, CdDespesa) == 0
+
+
+def test_origem_nao_configurada_fica_registrada(app, db):
+    app.config.update(RECEITA_API_URL="", CONTROLE_API_URL="")
+    execucao = sincronizar()
+    assert execucao.contagens == {"receita": "não configurada", "controle": "não configurada"}
+
+
+def test_trava_impede_duas_rodadas(origens, db):
+    from sqlalchemy import text
+
+    from app.sync.executor import CHAVE_TRAVA
+
+    outra = db.engine.connect()
+    try:
+        outra.execute(text("SELECT pg_advisory_lock(:k)"), {"k": CHAVE_TRAVA})
+        assert sincronizar() is None
+    finally:
+        outra.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": CHAVE_TRAVA})
+        outra.close()
+
+
+def test_incremental_pede_desde_a_marca(origens, db):
+    sincronizar(completo=False)
+    origens["chamadas"].clear()
+    sincronizar(completo=False)
+    pedidos_nf = [u for u in origens["chamadas"] if "/invoices" in u]
+    assert pedidos_nf and all("updated_since" in u for u in pedidos_nf)
+
+
+def test_sincronizar_agora_so_admin(origens, entrar, admin, operador, db):
+    assert entrar(operador).post("/administracao/sincronizar").status_code == 403
+    resposta = entrar(admin).post("/administracao/sincronizar")
+    assert resposta.status_code == 302
+    assert db.session.scalars(select(SyncExecucao)).one().disparo == "manual"
