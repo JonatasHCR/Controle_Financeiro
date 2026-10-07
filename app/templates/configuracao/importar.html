@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block titulo %}Importar planilha{% endblock %}
+{% block subtitulo %}Configuração · importar planilha{% endblock %}
+
+{% block conteudo %}
+<div class="cfg">
+  <div class="cfg-head"><div><h2>Importar planilha de configuração</h2>
+    <p class="sub">Use o modelo baixado do sistema. Vários contratos podem vir na mesma planilha. Antes de gravar, o sistema mostra uma prévia por aba.</p></div>
+    <a class="btn" href="{{ url_for('configuracao.modelo') }}">Baixar modelo em branco (.xlsx)</a>
+  </div>
+  <section class="card" style="max-width:640px">
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('configuracao.previa') }}">
+      {{ form_csrf() }}
+      <div class="drop" id="drop">
+        <b>Arraste a planilha aqui</b><span class="note">ou</span>
+        <label class="btn" for="f-arq">Escolher arquivo .xlsx</label>
+        <input type="file" id="f-arq" name="arquivo" accept=".xlsx" hidden required>
+        <span class="note" id="f-nome">Nenhum arquivo escolhido</span>
+      </div>
+      <div class="cfg-bar" style="margin-top:12px"><a class="link" href="{{ url_for('configuracao.lista') }}">Voltar</a><button type="submit" class="btn prim">Ver prévia</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/configuracao.js') }}" defer></script>{% endblock %}

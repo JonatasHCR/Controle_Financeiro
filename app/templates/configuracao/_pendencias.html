@@ -1,0 +1,24 @@
+<div class="tbl-wrap" style="max-height:520px"><table>
+  <thead><tr><th>Assunto</th><th style="width:160px">Prazo</th><th style="width:120px">Prioridade</th><th style="width:140px">Status</th><th>Remover</th></tr></thead>
+  <tbody>
+    {% for p in pendencias %}
+      <tr>
+        <td><input class="in" name="pd-{{ loop.index0 }}-assunto" value="{{ p.assunto }}" aria-label="Assunto"></td>
+        <td><input class="in" type="date" name="pd-{{ loop.index0 }}-prazo" value="{{ p.prazo.isoformat() if p.prazo else '' }}" aria-label="Prazo"></td>
+        <td><select class="in" name="pd-{{ loop.index0 }}-prioridade" aria-label="Prioridade">{% for o in prioridades %}<option {% if o == p.prioridade %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></td>
+        <td><select class="in" name="pd-{{ loop.index0 }}-status" aria-label="Status">{% for o in status_pendencia %}<option {% if o == p.status %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></td>
+        <td><input type="checkbox" name="pd-{{ loop.index0 }}-remover" aria-label="Remover pendência"></td>
+      </tr>
+    {% endfor %}
+    {% for n in range(pendencias | length, pendencias | length + 2) %}
+      <tr>
+        <td><input class="in" name="pd-{{ n }}-assunto" placeholder="nova pendência" aria-label="Assunto da nova pendência"></td>
+        <td><input class="in" type="date" name="pd-{{ n }}-prazo" aria-label="Prazo"></td>
+        <td><select class="in" name="pd-{{ n }}-prioridade" aria-label="Prioridade">{% for o in prioridades %}<option {% if o == 'MÉDIA' %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></td>
+        <td><select class="in" name="pd-{{ n }}-status" aria-label="Status">{% for o in status_pendencia %}<option>{{ o }}</option>{% endfor %}</select></td>
+        <td></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table></div>
+<div class="cfg-bar"><span class="note">O painel mostra só as abertas, ordenadas por prazo.</span><button type="submit" class="btn prim">Salvar pendências</button></div>

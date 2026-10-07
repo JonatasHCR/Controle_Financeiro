@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block titulo %}Auditoria{% endblock %}
+{% block subtitulo %}Auditoria{% endblock %}
+
+{% block conteudo %}
+<div class="cfg">
+  <div class="cfg-head"><div><h2>Auditoria</h2><p class="sub">Registro do que foi feito no sistema. A trilha só recebe entradas: nada aqui é editado nem apagado pela aplicação.</p></div></div>
+
+  <form class="filtros-l" method="get">
+    <label class="lbl">Ação<select class="in" name="acao" data-enviar-ao-mudar><option value="">todas</option>{% for item in acoes %}<option value="{{ item }}" {% if filtro_acao == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+    <label class="lbl">Alvo<select class="in" name="alvo_tipo" data-enviar-ao-mudar><option value="">todos</option>{% for item in tipos %}<option value="{{ item }}" {% if filtro_tipo == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+    <label class="lbl">Pessoa<select class="in" name="usuario" data-enviar-ao-mudar><option value="">todas</option>{% for identificador, nome in pessoas.items() %}<option value="{{ identificador }}" {% if filtro_usuario == identificador %}selected{% endif %}>{{ nome }}</option>{% endfor %}</select></label>
+    <a class="link" href="{{ url_for('auditoria.lista') }}">Limpar</a>
+  </form>
+
+  <section class="card">
+    <div class="tbl-wrap" style="max-height:none"><table>
+      <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Alvo</th><th>Detalhes</th></tr></thead>
+      <tbody>
+        {% for entrada in pagina.items %}
+          <tr><td>{{ entrada.criado_em.astimezone().strftime('%d/%m/%Y %H:%M') }}</td><td>{{ pessoas.get(entrada.usuario_id, '—') }}</td>
+            <td>{{ entrada.acao }}</td><td>{{ entrada.alvo_tipo }}{% if entrada.alvo_id %} #{{ entrada.alvo_id }}{% endif %}</td>
+            <td>{% if entrada.payload %}{% for chave, valor in entrada.payload.items() %}<span class="pill neu">{{ chave }}: {{ valor }}</span> {% endfor %}{% endif %}</td></tr>
+        {% else %}
+          <tr><td colspan="5" class="empty">Nada registrado ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% if pagina.pages > 1 %}
+      <nav class="paginacao">
+        {% if pagina.has_prev %}<a href="{{ url_for('auditoria.lista', pagina=pagina.prev_num, **query_base) }}">‹ anterior</a>{% endif %}
+        <span>página {{ pagina.page }} de {{ pagina.pages }}</span>
+        {% if pagina.has_next %}<a href="{{ url_for('auditoria.lista', pagina=pagina.next_num, **query_base) }}">próxima ›</a>{% endif %}
+      </nav>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

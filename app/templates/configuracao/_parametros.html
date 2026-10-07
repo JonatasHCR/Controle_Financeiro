@@ -1,0 +1,11 @@
+<div class="form">
+  <label>Tributos da NF (%)<input class="in" name="tributos" inputmode="decimal" value="{{ (contrato.tributos * 100) | numero_br }}"></label>
+  <label>Taxa adm. UFC (%)<input class="in" name="taxa_adm" inputmode="decimal" value="{{ (contrato.taxa_adm * 100) | numero_br }}"></label>
+  <label>BDI resultante<span class="ro">{{ contrato.bdi | numero_br(4) }}</span></label>
+</div>
+<p class="note">{% if parametros %}Este contrato usa valores próprios.{% else %}Este contrato usa o padrão global.{% endif %}
+  Altere só quando o contrato for diferente do padrão (tributos {{ (config.TRIBUTOS_PADRAO | float * 100) | round | int }}% e taxa adm. {{ (config.TAXA_ADM_PADRAO | float * 100) | round | int }}%).</p>
+<div class="cfg-bar">
+  <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="padrao"> Voltar ao padrão global</label>
+  <button type="submit" class="btn prim">Salvar parâmetros</button>
+</div>

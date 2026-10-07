@@ -1,0 +1,35 @@
+<div class="tbl-wrap" style="max-height:520px"><table>
+  <thead><tr><th>Código</th><th>Descrição</th><th>Unid.</th><th class="r">Qtd.</th><th class="r">Custo-alvo</th><th class="r">Custo-alvo projetado</th><th class="r">Qtd. medida</th><th>Remover</th></tr></thead>
+  <tbody>
+    {% for it in itens %}
+      <tr>
+        <td style="width:80px"><input class="in" name="it-{{ loop.index0 }}-codigo" value="{{ it.codigo }}" required></td>
+        <td><input class="in" name="it-{{ loop.index0 }}-descricao" value="{{ it.descricao }}" required></td>
+        <td style="width:90px"><input class="in" name="it-{{ loop.index0 }}-unidade" value="{{ it.unidade }}"></td>
+        <td style="width:90px"><input class="in r" name="it-{{ loop.index0 }}-quantidade" value="{{ it.quantidade | numero_br }}" inputmode="decimal"></td>
+        <td style="width:140px"><input class="in r" name="it-{{ loop.index0 }}-custo_alvo" value="{{ it.custo_alvo | numero_br }}" inputmode="decimal"></td>
+        <td style="width:140px"><input class="in r" name="it-{{ loop.index0 }}-custo_alvo_projetado" value="{{ it.custo_alvo_projetado | numero_br }}" placeholder="= custo-alvo" inputmode="decimal"></td>
+        <td style="width:100px"><input class="in r" name="it-{{ loop.index0 }}-quantidade_medida" value="{{ it.quantidade_medida | numero_br }}" inputmode="decimal"></td>
+        <td><input type="checkbox" name="it-{{ loop.index0 }}-remover" aria-label="Remover {{ it.codigo }}"></td>
+      </tr>
+    {% endfor %}
+    {% for n in range(itens | length, itens | length + 3) %}
+      <tr>
+        <td><input class="in" name="it-{{ n }}-codigo" placeholder="novo"></td>
+        <td><input class="in" name="it-{{ n }}-descricao"></td>
+        <td><input class="in" name="it-{{ n }}-unidade"></td>
+        <td><input class="in r" name="it-{{ n }}-quantidade" inputmode="decimal"></td>
+        <td><input class="in r" name="it-{{ n }}-custo_alvo" inputmode="decimal"></td>
+        <td><input class="in r" name="it-{{ n }}-custo_alvo_projetado" inputmode="decimal"></td>
+        <td><input class="in r" name="it-{{ n }}-quantidade_medida" inputmode="decimal"></td>
+        <td></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot><tr><td colspan="4">Total</td><td class="r">{{ soma_itens | moeda }}</td><td colspan="3"></td></tr></tfoot>
+</table></div>
+<div class="cfg-bar">
+  <span class="note">Custo-alvo contratual (valor × (1 − tributos) ÷ (1 + taxa adm.)): <b>{{ alvo_contratual | moeda }}</b> ·
+    {% if alvo_contratual and ((soma_itens - alvo_contratual) | abs) / alvo_contratual < 0.01 %}<span class="pill ok">itens conferem</span>{% else %}<span class="pill warn">diferença de {{ (soma_itens - alvo_contratual) | moeda }}</span>{% endif %}</span>
+  <button type="submit" class="btn prim">Salvar itens</button>
+</div>

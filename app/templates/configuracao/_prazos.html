@@ -1,0 +1,16 @@
+<div class="form">
+  <label>Número do contrato<span class="ro">{{ contrato.numero or '—' }}</span></label>
+  <label>Cliente<span class="ro">{{ contrato.cliente }}</span></label>
+  <label>Início<span class="ro">{{ contrato.inicio | data if contrato.inicio else '—' }}</span></label>
+  <label>Fim da vigência<span class="ro">{{ contrato.fim_vigencia | data if contrato.fim_vigencia else '—' }}</span></label>
+  <label>Valor atual<span class="ro">{{ contrato.valor | moeda }}</span></label>
+  <label>Coordenadores<span class="ro">{{ contrato.coordenadores | join(' / ') or '—' }}</span></label>
+</div>
+<p class="note">Vêm do Gerenciamento de Receita e só mudam lá.</p>
+<div class="form">
+  <label>Fim da execução<input class="in" type="date" name="fim_execucao" value="{{ contrato.fim_execucao.isoformat() if contrato.fim_execucao else '' }}"></label>
+  <label>Horizonte da projeção<span class="ro">{{ contrato.horizonte | data if contrato.horizonte else '—' }}
+    <span class="note">({{ 'vigência, que termina antes da execução' if contrato.fim_vigencia and contrato.fim_execucao and contrato.fim_vigencia < contrato.fim_execucao else 'fim da execução' }})</span></span></label>
+</div>
+<p class="note">O fim da execução é a única data que a Receita não tem. Em branco, vale o fim da vigência. Quando a vigência termina antes, a projeção usa a vigência até o aditivo de prazo chegar.</p>
+<div class="cfg-bar"><span></span><button type="submit" class="btn prim">Salvar</button></div>

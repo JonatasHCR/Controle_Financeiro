@@ -1,0 +1,18 @@
+<p class="note">As NFs vêm do Gerenciamento de Receita. Informe o número do boletim de medição (BM) e a data-base de cada uma. Sem data-base, vale o mês de emissão.</p>
+<div class="tbl-wrap" style="max-height:520px"><table>
+  <thead><tr><th class="r">NF</th><th>Emissão</th><th>Tipo</th><th class="r">Valor</th><th style="width:160px">Data-base</th><th style="width:110px">BM</th></tr></thead>
+  <tbody>
+    {% for nf in nfs %}
+      <tr>
+        <td class="r">{{ nf.numero }}<input type="hidden" name="bm-{{ loop.index0 }}-nf" value="{{ nf.id }}"></td>
+        <td>{{ nf.emitida_em | data }}</td><td>{{ 'Reajuste' if nf.tipo == 'reajuste' else 'Medição' }}</td>
+        <td class="r">{{ nf.valor | moeda }}</td>
+        <td><input class="in" type="month" name="bm-{{ loop.index0 }}-data_base" value="{{ nf.data_base.strftime('%Y-%m') if nf.data_base else '' }}" aria-label="Data-base da NF {{ nf.numero }}"></td>
+        <td><input class="in r" name="bm-{{ loop.index0 }}-numero" value="{{ nf.bm if nf.bm is not none else '' }}" inputmode="numeric" aria-label="BM da NF {{ nf.numero }}"></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="empty">Nenhuma NF deste contrato sincronizada.</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div>
+<div class="cfg-bar"><span></span><button type="submit" class="btn prim" {% if not nfs %}disabled{% endif %}>Salvar BMs</button></div>

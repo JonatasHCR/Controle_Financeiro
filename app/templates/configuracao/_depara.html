@@ -1,0 +1,25 @@
+<div class="cfg-bar"><span class="note">Cada natureza do Controle de Despesa aponta para um item do contrato. <b>{{ (cobertura * 100) | round(1) | numero_br }}%</b> do custo está classificado.</span>
+  {% if cobertura < 0.999 %}<span class="pill warn">há natureza sem item</span>{% else %}<span class="pill ok">tudo classificado</span>{% endif %}</div>
+{% if not itens and contrato.receita %}<div class="aviso">Cadastre os itens do contrato (aba Itens) para poder ligar as naturezas a eles.</div>{% endif %}
+<div class="tbl-wrap" style="max-height:520px"><table>
+  <thead><tr><th>Natureza (Controle de Despesa)</th><th class="r">Custo realizado</th><th>Item do contrato</th></tr></thead>
+  <tbody>
+    {% for n in naturezas %}
+      <tr>
+        <td>{{ n.nome }}<input type="hidden" name="dp-{{ loop.index0 }}-natureza" value="{{ n.norm }}"></td>
+        <td class="r">{{ n.total | moeda }}</td>
+        <td style="width:380px">
+          <select class="in" name="dp-{{ loop.index0 }}-item" aria-label="Item para {{ n.nome }}">
+            <option value="">— não classificado —</option>
+            {% for it in itens %}<option value="{{ it.codigo }}" {% if (n.item or n.sugestao) == it.codigo %}selected{% endif %}>{{ it.codigo }} · {{ it.descricao }}</option>{% endfor %}
+          </select>
+          {% if not n.definido and n.sugestao %}<span class="pill info">sugerido</span>{% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3" class="empty">Nenhuma despesa deste CR no Controle de Despesa.</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div>
+<p class="note">A sugestão vem da semelhança entre o nome da natureza e a descrição do item. Confira e salve.</p>
+<div class="cfg-bar"><span></span><button type="submit" class="btn prim" {% if not naturezas %}disabled{% endif %}>Salvar de-para</button></div>

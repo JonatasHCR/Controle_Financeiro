@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block titulo %}Configuração{% endblock %}
+{% block subtitulo %}Configuração dos contratos{% endblock %}
+
+{% macro pill(classe, texto) %}<span class="pill {{ classe }}">{{ texto }}</span>{% endmacro %}
+
+{% block conteudo %}
+<div class="cfg">
+  <div class="cfg-head">
+    <div><h2>Configuração dos contratos</h2>
+      <p class="sub">Aqui só se completam informações que a sincronização não traz: custo-alvo dos itens, fim da execução, de-para das naturezas, BMs, pendências e pleitos. Contratos, receitas e despesas não são cadastrados aqui: vêm do Gerenciamento de Receita e do Controle de Despesa.</p></div>
+    <div class="acoes">
+      <a class="btn" href="{{ url_for('configuracao.modelo') }}">Baixar modelo em branco (.xlsx)</a>
+      <a class="btn prim" href="{{ url_for('configuracao.importar') }}">Importar planilha</a>
+    </div>
+  </div>
+
+  <div class="cfg-grid">
+    <aside class="cfg-col">
+      <input class="in" type="search" id="cfg-busca" placeholder="Buscar CR, nome ou cliente…" aria-label="Buscar contrato">
+      <div class="cfg-lista" id="cfg-lista">
+        {% for s in status %}{% set c = s.contrato %}
+          <a class="cfg-item" href="{{ url_for('configuracao.lista', cr=c.cr, aba=aba) }}" {% if contrato and c.cr == contrato.cr %}aria-current="true"{% endif %}>
+            <b><span class="dot" style="background:var(--c{{ c.cor + 1 }})"></span>{{ c.cr }} · {{ c.nome }}</b>
+            <small>{{ c.cliente }}</small>
+            <span class="cfg-st">
+              {% if not c.receita %}{{ pill('warn', 'sem contrato na Receita') }}{% else %}
+                {% if not c.despesa %}{{ pill('info', 'sem despesa') }}{% endif %}
+                {{ pill('ok' if s.itens_ok else 'warn', s.itens ~ ' itens') }}
+                {% if s.sem_bm %}{{ pill('warn', s.sem_bm ~ ' NFs sem BM') }}{% endif %}
+                {{ pill('neu', s.pendencias ~ ' pendências') }}
+                {{ pill('neu', s.pleitos ~ ' pleitos') }}
+              {% endif %}
+              {% if s.cobertura is not none %}{{ pill('ok' if s.cobertura > 0.999 else 'warn', 'de-para ' ~ (s.cobertura * 100) | round | int ~ '%') }}{% endif %}
+            </span>
+          </a>
+        {% else %}
+          <p class="empty">Nenhum CR sincronizado ainda. Rode a sincronização na Administração.</p>
+        {% endfor %}
+      </div>
+    </aside>
+
+    {% if contrato %}
+    <section class="card cfg-main">
+      <div class="cfg-bar">
+        <div><h2 style="font-size:17px">{{ contrato.cr }} · {{ contrato.descricao }}</h2>
+          <p class="sub">{{ contrato.numero or '—' }} · {{ contrato.cliente }}</p></div>
+        <a class="btn" href="{{ url_for('configuracao.planilha_do_cr', cr=contrato.cr) }}">Baixar planilha deste contrato (.xlsx)</a>
+      </div>
+      <nav class="tabs" aria-label="Grupos">
+        {% for chave, rotulo in abas %}
+          {% if contrato.receita or chave in abas_sem_receita %}
+            <a href="{{ url_for('configuracao.lista', cr=contrato.cr, aba=chave) }}" {% if chave == aba %}aria-current="page"{% endif %}>{{ rotulo }}</a>
+          {% endif %}
+        {% endfor %}
+      </nav>
+      {% if not contrato.receita %}
+        <div class="aviso">O CR {{ contrato.cr }} existe só no Controle de Despesa. Enquanto não houver contrato no Gerenciamento de Receita, o Controle Financeiro mostra os custos dele com receita zero. Itens, prazos, BMs e pleitos ficam disponíveis quando o contrato chegar pela sincronização.</div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('configuracao.salvar', cr=contrato.cr, aba=aba) }}">
+        {{ form_csrf() }}
+        {% include 'configuracao/_' ~ aba ~ '.html' %}
+      </form>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/configuracao.js') }}" defer></script>{% endblock %}

@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block titulo %}Sem acesso{% endblock %}
+
+{% block conteudo %}
+  <div class="centro">
+    <div class="card">
+      <h2 style="font-size:20px">Você entrou, mas não tem acesso a este sistema</h2>
+      <p class="sub">Seu login funcionou. Falta o seu usuário estar no grupo do Controle Financeiro. Quem administra a plataforma pode incluir você pelo portal.</p>
+      <a class="btn prim" style="justify-content:center" href="{{ portal }}">Voltar ao portal</a>
+    </div>
+  </div>
+{% endblock %}

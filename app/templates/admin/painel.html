@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block titulo %}Administração{% endblock %}
+{% block subtitulo %}Administração{% endblock %}
+
+{% block conteudo %}
+<div class="cfg">
+  <div class="cfg-head"><div><h2>Administração</h2><p class="sub">Backup, restauração, sincronização e perfis de acesso.</p></div></div>
+  <div class="adm-grid">
+
+    <section class="card">
+      <div class="cfg-bar"><h2>Backups</h2>
+        <form method="post" action="{{ url_for('admin.criar_backup') }}">{{ form_csrf() }}<button type="submit" class="btn prim">Gerar backup agora</button></form>
+      </div>
+      <p class="note">O sidecar de backup grava aqui automaticamente, de {{ config.get('BACKUP_INTERVAL_HOURS', 24) }} em {{ config.get('BACKUP_INTERVAL_HOURS', 24) }} horas. Automáticos e manuais aparecem na mesma lista.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Arquivo</th><th>Quando</th><th>Origem</th><th class="r">Tamanho</th><th></th></tr></thead>
+        <tbody>
+          {% for backup in backups %}
+            <tr><td>{{ backup.nome }}</td><td>{{ backup.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td><span class="pill {{ 'info' if backup.origem == 'manual' else 'neu' }}">{{ backup.origem }}</span></td>
+              <td class="r">{{ (backup.bytes / 1024) | round | int | numero }} KB</td>
+              <td><a class="btn" href="{{ url_for('admin.baixar_backup', nome=backup.nome) }}">Baixar</a></td></tr>
+          {% else %}
+            <tr><td colspan="5" class="empty">Nenhum backup ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="card">
+      <div class="cfg-bar"><h2>Sincronização</h2>
+        <form method="post" action="{{ url_for('admin.sincronizar') }}">{{ form_csrf() }}<button type="submit" class="btn">Sincronizar agora</button></form>
+      </div>
+      <p class="note">Gerenciamento de Receita e Controle de Despesa, a cada {{ config.get('SYNC_INTERVAL_MINUTES', 15) }} minutos, com recarga completa uma vez por dia.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Quando</th><th>Disparo</th><th>Situação</th><th>Detalhes</th></tr></thead>
+        <tbody>
+          {% for e in execucoes %}
+            <tr><td>{{ e.iniciado_em.astimezone().strftime('%d/%m/%Y %H:%M') }}</td><td>{{ e.disparo }}</td>
+              <td><span class="pill {{ {'ok': 'ok', 'parcial': 'warn', 'em_andamento': 'info'}.get(e.status, 'crit') }}">{{ e.status.replace('_', ' ') }}</span></td>
+              <td>{% if e.erro %}{{ e.erro }}{% else %}{% for fonte, c in e.contagens.items() %}<b>{{ fonte }}</b>: {% if c is mapping %}{% for k, v in c.items() %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}{{ c }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}</td></tr>
+          {% else %}
+            <tr><td colspan="4" class="empty">Nenhuma sincronização ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+      {% if sem_par.so_receita or sem_par.so_controle %}
+        <div class="aviso">
+          {% if sem_par.so_receita %}Só na Receita (entram com custo zero): <b>{{ sem_par.so_receita | join(', ') }}</b>.{% endif %}
+          {% if sem_par.so_controle %}Só no Controle de Despesa (entram com receita zero): <b>{{ sem_par.so_controle | join(', ') }}</b>.{% endif %}
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="card adm-full">
+      <h2>Perfis de acesso</h2>
+      <p class="note">Quem entra é decidido pelo grupo <b>{{ config.OIDC_REQUIRED_GROUP }}</b> no Keycloak. O que a pessoa faz aqui dentro é decidido nesta tabela: leitor vê o painel e gera relatórios; operador também mantém a configuração; admin também acessa administração e auditoria.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Pessoa</th><th>E-mail</th><th>Situação</th><th>Perfil</th></tr></thead>
+        <tbody>
+          {% for pessoa in pessoas %}
+            <tr><td>{{ pessoa.nome }}</td><td>{{ pessoa.email }}</td>
+              <td>{% if pessoa.ativo %}<span class="pill ok">ativa</span>{% else %}<span class="pill warn">sem o grupo</span>{% endif %}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin.mudar_perfil', identificador=pessoa.id) }}" class="filtros-l">
+                  {{ form_csrf() }}
+                  <select class="in" name="perfil" aria-label="Perfil de {{ pessoa.nome }}" style="width:auto">
+                    {% for perfil in perfis %}<option value="{{ perfil }}" {% if pessoa.perfil == perfil %}selected{% endif %}>{{ perfil }}</option>{% endfor %}
+                  </select>
+                  <button type="submit" class="btn">Salvar</button>
+                </form>
+              </td></tr>
+          {% else %}
+            <tr><td colspan="4" class="empty">Ninguém entrou ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="card adm-full">
+      <h2 class="perigo">Restauração</h2>
+      <p class="note">Substitui o conteúdo do banco pelo do arquivo escolhido. Gere um backup antes.</p>
+      <form method="post" action="{{ url_for('admin.restauracao') }}" class="filtros-l" data-confirmar="Substituir o banco inteiro pelo backup escolhido?">
+        {{ form_csrf() }}
+        <label class="lbl">Arquivo
+          <select class="in" name="arquivo">
+            {% for backup in backups %}<option value="{{ backup.nome }}">{{ backup.nome }} ({{ backup.criado_em.strftime('%d/%m %H:%M') }})</option>{% endfor %}
+          </select></label>
+        <label class="lbl">Digite RESTAURAR para confirmar<input class="in" type="text" name="confirmacao" autocomplete="off"></label>
+        <button type="submit" class="btn perigo" {% if not backups %}disabled{% endif %}>Restaurar</button>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

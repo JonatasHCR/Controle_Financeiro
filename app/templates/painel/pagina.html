@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block titulo %}Painel{% endblock %}
+{% block classe_body %}{% if impressao %}pre impressao{% endif %}{% endblock %}
+{% block subtitulo %}Gestor: <span id="gestor">{{ dados.meta.rotulos.gestor }}</span> · base {{ dados.meta.corte_txt }}{% endblock %}
+
+{% block acoes_topo %}
+  <button type="button" class="btn so-painel" id="bt-pre">Pré-visualizar relatório</button>
+  <button type="button" class="btn prim so-painel" id="bt-pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M12 12v6m-3-3 3 3 3-3"/></svg>Gerar PDF</button>
+{% endblock %}
+
+{% block conteudo %}
+<div class="app">
+  <aside class="filtros" aria-label="Filtros">
+    <h2>Filtros</h2>
+    <div class="campo"><span class="lbl" id="l-cli">Cliente</span><div class="ms" id="f-cli" data-k="cli" aria-labelledby="l-cli"></div></div>
+    <div class="campo"><span class="lbl" id="l-coord">Coordenador</span><div class="ms" id="f-coord" data-k="coord" aria-labelledby="l-coord"></div></div>
+    <div class="campo"><span class="lbl" id="l-cr">Centro de custo (CR)</span><div class="ms" id="f-cr" data-k="cr" aria-labelledby="l-cr"></div></div>
+    <div class="campo"><span class="lbl">Período</span>
+      <div class="seg seg2" role="group" aria-label="Modo do período"><button type="button" data-modo="todas">Todas as datas</button><button type="button" data-modo="acum">Acumulado até</button><button type="button" data-modo="mes">Só o mês</button><button type="button" data-modo="intervalo">Intervalo</button></div>
+    </div>
+    <div class="campo" id="w-mes" hidden><label class="lbl" for="f-mes" id="l-mes">Mês</label><select id="f-mes"></select></div>
+    <div class="campo" id="w-int" hidden><div class="dupla"><div class="campo"><label class="lbl" for="f-de">De</label><input type="date" id="f-de" class="in"></div><div class="campo"><label class="lbl" for="f-ate">Até</label><input type="date" id="f-ate" class="in"></div></div><p class="note">NFs pela data de emissão e despesas pela data de baixa.</p></div>
+    <button type="button" class="link" id="bt-limpar">Limpar filtros</button>
+    <div class="legenda-c" id="legenda-c" aria-label="Contratos"></div>
+  </aside>
+
+  <main id="main">
+    <header class="cab-rel"><div><div class="eb">UFC Engenharia · Controle Financeiro · Relatório</div><h1 id="rel-titulo"></h1></div><dl id="rel-filtros"></dl></header>
+    <p class="context" id="context"></p>
+    <div class="card vazio" id="vazio" hidden><h2>Nenhum contrato atende a esses filtros</h2><p class="sub">Os clientes e coordenadores escolhidos não têm contrato em comum. Desmarque algum item ou use “Limpar filtros”.</p></div>
+
+    <section class="card span-12" aria-label="Ficha do contrato"><div class="ficha" id="ficha"></div></section>
+
+    <section class="card span-12">
+      <div class="card-head"><div><h2>Da receita ao resultado</h2><p class="sub" id="sub-cascata"></p></div></div>
+      <div class="cascata">
+        <div class="chart h280"><canvas id="c-cascata" aria-label="Cascata da receita bruta ao resultado atual"></canvas></div>
+        <div class="razao" id="razao"></div>
+      </div>
+    </section>
+
+    <section class="card span-12">
+      <div class="card-head"><div><h2>Recebimento das NFs emitidas</h2><p class="sub" id="sub-receb"></p></div>
+        <div class="legend"><span><i class="sw" style="background:var(--paid)"></i>Pago</span><span><i class="sw" style="background:var(--open)"></i>Não pago</span></div></div>
+      <div class="rec">
+        <div><div class="rec-tot" id="rec-tot"></div><div class="chart" id="rec-box"><canvas id="c-receb" aria-label="Pago e não pago por contrato"></canvas></div></div>
+        <div class="abertas"><h3>NFs em aberto por contrato</h3><div id="rc-open" style="display:flex;flex-direction:column;gap:12px"></div></div>
+      </div>
+    </section>
+
+    <section class="card span-7">
+      <div class="card-head"><div><h2>Receita líquida × custo realizado</h2><p class="sub">Ganho = receita líquida − custo do mês · clique num mês para filtrar</p></div>
+        <div class="legend"><span><i class="sw" style="background:var(--rev)"></i>Receita líquida</span><span><i class="sw" style="background:var(--cost)"></i>Custo realizado</span><span><i class="sw-line" style="border-color:var(--ink)"></i>Ganho</span></div></div>
+      <div class="chart h300"><canvas id="c-mensal" aria-label="Receita líquida, custo e ganho por mês"></canvas></div>
+    </section>
+
+    <section class="card span-5">
+      <div class="card-head"><div><h2>Custo-alvo, tendência e markup</h2><p class="sub" id="sub-ct"></p></div></div>
+      <div class="blocos" id="ctiles"></div>
+      <div><div class="card-head" style="margin-bottom:4px"><h3 style="font-size:13px">Resultado atual × final</h3><div class="legend"><span><i class="sw-line"></i>Realizado</span><span><i class="sw-line dash"></i>Tendência</span></div></div>
+        <div class="chart h200"><canvas id="c-res" aria-label="Resultado acumulado e tendência"></canvas></div><p class="note" id="sub-res" style="margin-top:4px"></p></div>
+      <div class="blocos" id="mtiles"></div>
+    </section>
+
+    <section class="card span-5">
+      <div class="card-head"><div><h2>Execução financeira × tempo</h2><p class="sub">Barra = faturado · seta = tempo transcorrido · pontilhado = fim da receita projetada · clique para filtrar</p></div></div>
+      <div class="prog" id="exec"></div>
+    </section>
+
+    <section class="card span-7">
+      <div class="card-head"><div><h2>Custo realizado por item</h2><p class="sub">10 maiores itens no período</p></div></div>
+      <div class="chart h300"><canvas id="c-itens" aria-label="Custo realizado por item"></canvas></div>
+    </section>
+
+    <section class="card span-6">
+      <div class="card-head"><div><h2>Desvio projetado por item</h2><p class="sub">Custo-alvo projetado − custo total projetado · 10 maiores</p></div>
+        <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>Economia</span><span><i class="sw" style="background:var(--neg)"></i>Estouro</span></div></div>
+      <div class="chart h300"><canvas id="c-desvio" aria-label="Desvio projetado por item"></canvas></div>
+    </section>
+
+    <section class="card span-6">
+      <div class="card-head"><div><h2>Prazos contratuais</h2><p class="sub">Barra = execução · marca = fim da vigência · tracejado = hoje</p></div></div>
+      <div class="chart h280" id="pz-box"><canvas id="c-prazos" aria-label="Prazos dos contratos"></canvas></div>
+      <p class="note" id="pz-risco"></p>
+    </section>
+
+    <section class="card span-6">
+      <div class="card-head"><div><h2>Pendências em aberto</h2><p class="sub">Ordenadas por prazo</p></div></div>
+      <div class="tbl-wrap" id="tb-conc"></div>
+    </section>
+
+    <section class="card span-6">
+      <div class="card-head"><div><h2>Aditivos, reajustes e reequilíbrios</h2><p class="sub">Pleitos e eventos contratuais</p></div></div>
+      <div class="blocos" id="dtiles"></div>
+      <div class="tbl-wrap" id="tb-adt"></div>
+    </section>
+
+    <section class="card span-12">
+      <div class="card-head"><div><h2>Notas fiscais emitidas</h2><p class="sub" id="sub-nf"></p></div>
+        <div class="seg-in" role="group" aria-label="Status das NFs"><button type="button" data-nf="all" aria-pressed="true">Todas</button><button type="button" data-nf="open" aria-pressed="false">Não pagas</button></div></div>
+      <div class="nfsum" id="nf-sum"></div>
+      <div class="tbl-wrap" id="tb-nf"></div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-t"><div class="modal-box"><div class="modal-h"><h2 id="modal-t"></h2><button type="button" class="x" id="modal-x" aria-label="Fechar">×</button></div><div id="modal-c"></div></div></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script type="application/json" id="dados-iniciais">{{ dados | tojson }}</script>
+<script type="application/json" id="config-painel">{{ {"api": url_for('painel.api'), "pdf": url_for('relatorio.pdf'), "impressao": impressao} | tojson }}</script>
+{% endblock %}
+
+{% block rodape %}
+<footer>
+  <span>Receita líquida = receita bruta − tributos da NF. Custo-alvo atual = receita líquida ÷ (1 + taxa adm.). Markup contratual = valor do contrato ÷ custo-alvo.</span>
+  <span>Fontes: Gerenciamento de Receita (contratos, NFs, recebimentos, aditivos) e Controle de Despesa (custo realizado). Itens, BMs, prazos de execução, pendências e pleitos vêm da Configuração.</span>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/painel.js') }}"></script>
+{% endblock %}

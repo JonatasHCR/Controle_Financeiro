@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block titulo %}{{ codigo }}{% endblock %}
+
+{% block conteudo %}
+  <div class="centro">
+    <div class="card">
+      <h2 style="font-size:20px">{{ codigo }} · {{ titulo }}</h2>
+      <p class="sub">{{ mensagem }}</p>
+      <a class="btn" style="justify-content:center" href="{{ url_for('painel.pagina') }}">Voltar ao painel</a>
+    </div>
+  </div>
+{% endblock %}

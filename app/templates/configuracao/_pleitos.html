@@ -1,0 +1,27 @@
+<div class="tbl-wrap" style="max-height:520px"><table>
+  <thead><tr><th style="width:160px">Data-base</th><th>Descrição</th><th style="width:150px">Tipo</th><th style="width:140px">Status</th><th style="width:140px" class="r">Valor bruto</th><th>Remover</th></tr></thead>
+  <tbody>
+    {% for p in pleitos %}
+      <tr>
+        <td><input class="in" type="month" name="pl-{{ loop.index0 }}-data_base" value="{{ p.data_base.strftime('%Y-%m') if p.data_base else '' }}" aria-label="Data-base"></td>
+        <td><input class="in" name="pl-{{ loop.index0 }}-descricao" value="{{ p.descricao }}" aria-label="Descrição">
+            <input type="hidden" name="pl-{{ loop.index0 }}-observacao" value="{{ p.observacao or '' }}"></td>
+        <td><select class="in" name="pl-{{ loop.index0 }}-tipo" aria-label="Tipo">{% for o in tipos_pleito %}<option {% if o == p.tipo %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></td>
+        <td><select class="in" name="pl-{{ loop.index0 }}-status" aria-label="Status">{% for o in status_pleito %}<option {% if o == p.status %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></td>
+        <td><input class="in r" name="pl-{{ loop.index0 }}-valor" value="{{ p.valor | numero_br }}" inputmode="decimal" aria-label="Valor"></td>
+        <td><input type="checkbox" name="pl-{{ loop.index0 }}-remover" aria-label="Remover pleito"></td>
+      </tr>
+    {% endfor %}
+    {% for n in range(pleitos | length, pleitos | length + 2) %}
+      <tr>
+        <td><input class="in" type="month" name="pl-{{ n }}-data_base" aria-label="Data-base"></td>
+        <td><input class="in" name="pl-{{ n }}-descricao" placeholder="novo pleito" aria-label="Descrição do novo pleito"></td>
+        <td><select class="in" name="pl-{{ n }}-tipo" aria-label="Tipo">{% for o in tipos_pleito %}<option>{{ o }}</option>{% endfor %}</select></td>
+        <td><select class="in" name="pl-{{ n }}-status" aria-label="Status">{% for o in status_pleito %}<option {% if o == 'SOLICITAR' %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></td>
+        <td><input class="in r" name="pl-{{ n }}-valor" inputmode="decimal" aria-label="Valor"></td>
+        <td></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table></div>
+<div class="cfg-bar"><span class="note">Validado e feito contam como aprovados.</span><button type="submit" class="btn prim">Salvar pleitos</button></div>
