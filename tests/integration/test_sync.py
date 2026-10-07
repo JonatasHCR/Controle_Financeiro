@@ -11,7 +11,15 @@ import pytest
 import responses
 from sqlalchemy import func, select
 
-from app.models import CdDespesa, RcContrato, RcContratoCoordenador, RcNf, RcPrevisao, SyncExecucao
+from app.models import (
+    CdCentro,
+    CdDespesa,
+    RcContrato,
+    RcContratoCoordenador,
+    RcNf,
+    RcPrevisao,
+    SyncExecucao,
+)
 from app.sync.executor import sincronizar
 
 pytestmark = pytest.mark.integration
@@ -435,6 +443,8 @@ def test_despesa_de_centro_sem_contrato_nao_entra(origens, db):
     sincronizar()
     centros = set(db.session.scalars(select(CdDespesa.centro_origem_id)))
     assert centros == {9}
+    # nem o cadastro do centro sem contrato fica guardado
+    assert set(db.session.scalars(select(CdCentro.origem_id))) == {9}
     pedido = next(u for u in origens["chamadas"] if "/despesas?" in u)
     assert parse_qs(urlparse(pedido).query)["centro_ids"] == ["9"]
 

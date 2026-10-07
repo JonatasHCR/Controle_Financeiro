@@ -44,11 +44,8 @@
           {% endfor %}
         </tbody>
       </table></div>
-      {% if sem_par.so_receita or sem_par.so_controle %}
-        <div class="aviso">
-          {% if sem_par.so_receita %}Só na Receita (entram com custo zero): <b>{{ sem_par.so_receita | join(', ') }}</b>.{% endif %}
-          {% if sem_par.so_controle %}Só no Controle de Despesa (sem contrato na Receita, as despesas não são trazidas): <b>{{ sem_par.so_controle | join(', ') }}</b>.{% endif %}
-        </div>
+      {% if sem_par.so_receita %}
+        <div class="aviso">Contratos da Receita sem centro de custo no Controle de Despesa (aparecem com custo zero): <b>{{ sem_par.so_receita | join(', ') }}</b>.</div>
       {% endif %}
     </section>
 

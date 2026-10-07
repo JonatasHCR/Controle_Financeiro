@@ -38,7 +38,13 @@ def _dec(valor) -> Decimal | None:
 
 
 def _dominios(session, cliente) -> dict:
-    centros = cliente.get("centros_custo")["centros_custo"]
+    # A lista vem inteira para achar os pares, mas só fica o centro com contrato na Receita.
+    com_contrato = set(session.scalars(select(RcContrato.cr_norm)))
+    centros = [
+        c
+        for c in cliente.get("centros_custo")["centros_custo"]
+        if cr_norm(c["codigo"]) in com_contrato
+    ]
     upsert(
         session,
         CdCentro,
