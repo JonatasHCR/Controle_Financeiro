@@ -311,10 +311,15 @@ body.pre .card{break-inside:avoid}
   .card{break-inside:avoid}
   /* tabela longa (NFs, aditivos) sai inteira, quebrando entre páginas */
   .tbl-wrap{max-height:none!important;overflow:visible!important}
-  .card.longo{break-inside:auto}
+  /* body.pre .card (fora do @media) é mais específico; a exceção precisa igualar */
+  .card.longo,body.pre .card.longo{break-inside:auto}
   thead{display:table-header-group}
   tfoot{display:table-footer-group}
   tr{break-inside:avoid}
+  /* sticky na impressão repete a linha por cima do conteúdo de cada página */
+  th,tfoot td{position:static}
+  .card-head{break-after:avoid}
+  canvas{max-width:100%}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 

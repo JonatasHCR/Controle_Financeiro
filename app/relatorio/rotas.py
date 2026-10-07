@@ -23,6 +23,9 @@ from app.models import Usuario
 bp = Blueprint("relatorio", __name__, url_prefix="/relatorio")
 
 VALIDADE_TOKEN = 120
+# Largura útil da A4 paisagem com margem de 10 mm (277 mm a 96 dpi): a página é
+# montada já nesse tamanho, e os gráficos saem desenhados na largura da folha.
+LARGURA_FOLHA = 1047
 
 
 def _assinador() -> URLSafeTimedSerializer:
@@ -41,7 +44,8 @@ def gerar_pdf(url: str) -> bytes:
     with sync_playwright() as p:
         navegador = p.chromium.launch(args=["--no-sandbox"])
         try:
-            pagina = navegador.new_page(viewport={"width": 1240, "height": 900}, locale="pt-BR")
+            pagina = navegador.new_page(viewport={"width": LARGURA_FOLHA, "height": 740}, locale="pt-BR")
+            pagina.emulate_media(media="print")
             pagina.goto(url, wait_until="networkidle", timeout=30_000)
             pagina.wait_for_function("window.__graficosProntos === true", timeout=20_000)
             return pagina.pdf(
