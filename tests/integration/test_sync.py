@@ -93,6 +93,10 @@ def origens(app, db):
             },
         ],
         "exclusoes": [],
+        "centros": [
+            {"id": 9, "codigo": "4561", "nome": "Adutor", "ativo": True},
+            {"id": 7, "codigo": "0777", "nome": "Sem contrato", "ativo": True},
+        ],
         "chamadas": [],
         "falhar_controle": False,
     }
@@ -106,6 +110,9 @@ def origens(app, db):
             desde = consulta.get("updated_since") or consulta.get("since")
             if desde:
                 itens = [x for x in itens if _instante(_marca_do(x)) > _instante(desde)]
+            if "centro_ids" in consulta or (chave == "despesas" and "centro_ids" in req.url):
+                centros = {int(c) for c in consulta.get("centro_ids", "").split(",") if c}
+                itens = [x for x in itens if x["centro_custo_id"] in centros]
             ultimo = itens[-1] if itens else {}
             marca = _marca_do(ultimo)
             return (
@@ -167,13 +174,17 @@ def origens(app, db):
         )
         mock.add_callback(
             responses.GET,
-            re.compile(rf"{CONTROLE}/despesas/ids$"),
-            callback=lambda req: (200, {}, _json({"ids": [d["id"] for d in estado["despesas"]]})),
+            re.compile(rf"{CONTROLE}/despesas/ids(\?.*)?$"),
+            callback=lambda req: (
+                200,
+                {},
+                _json({"ids": [d["id"] for d in _dos_centros(estado["despesas"], req)]}),
+            ),
         )
-        mock.add(
+        mock.add_callback(
             responses.GET,
             f"{CONTROLE}/centros_custo",
-            json={"centros_custo": [{"id": 9, "codigo": "4561", "nome": "Adutor", "ativo": True}]},
+            callback=lambda req: (200, {}, _json({"centros_custo": estado["centros"]})),
         )
         mock.add(
             responses.GET,
@@ -187,16 +198,19 @@ def origens(app, db):
         )
         mock.add_callback(
             responses.GET,
-            re.compile(rf"{CONTROLE}/status$"),
+            re.compile(rf"{CONTROLE}/status(\?.*)?$"),
             callback=lambda req: (
                 200,
                 {},
                 _json(
                     {
                         "despesas": {
-                            "count": len(estado["despesas"]),
+                            "count": len(_dos_centros(estado["despesas"], req)),
                             "sum_valor_baixado": str(
-                                sum(Decimal(d["valor_baixado"]) for d in estado["despesas"])
+                                sum(
+                                    Decimal(d["valor_baixado"])
+                                    for d in _dos_centros(estado["despesas"], req)
+                                )
                             ),
                         }
                     }
@@ -204,6 +218,14 @@ def origens(app, db):
             ),
         )
         yield estado
+
+
+def _dos_centros(itens: list[dict], req) -> list[dict]:
+    consulta = parse_qs(urlparse(req.url).query)
+    if "centro_ids" not in consulta:
+        return itens
+    centros = {int(c) for c in consulta["centro_ids"][0].split(",") if c}
+    return [x for x in itens if x["centro_custo_id"] in centros]
 
 
 def _marca_do(item: dict):
@@ -390,3 +412,59 @@ def test_api_que_ignora_a_paginacao_nao_prende_o_sync():
         with pytest.raises(ErroDeSync, match="mesma página"):
             for _ in cliente.paginar("exclusoes", "exclusoes", limite=2, marca="since"):
                 pass
+
+
+# --- só os CRs com contrato na Receita --------------------------------------------
+
+
+def _despesa(id_, centro, data="2026-01-20"):
+    return {
+        "id": id_,
+        "centro_custo_id": centro,
+        "fornecedor_id": 1,
+        "natureza_id": 1,
+        "data_baixa": data,
+        "valor_original": "1.00",
+        "valor_baixado": "1.00",
+        "atualizado_em": f"{data}T00:00:00+00:00",
+    }
+
+
+def test_despesa_de_centro_sem_contrato_nao_entra(origens, db):
+    origens["despesas"].append(_despesa(50, centro=7))
+    sincronizar()
+    centros = set(db.session.scalars(select(CdDespesa.centro_origem_id)))
+    assert centros == {9}
+    pedido = next(u for u in origens["chamadas"] if "/despesas?" in u)
+    assert parse_qs(urlparse(pedido).query)["centro_ids"] == ["9"]
+
+
+def test_contrato_novo_na_receita_traz_o_historico_do_centro(origens, db):
+    origens["despesas"].append(_despesa(50, centro=7, data="2025-03-01"))  # antiga
+    sincronizar(completo=False)
+    assert _contar(db, CdDespesa) == 2
+
+    origens["cost_centers"].append(
+        {
+            **origens["cost_centers"][0],
+            "id": 2,
+            "cr_code": "777",
+            "updated_at": "2026-03-01T00:00:00Z",
+        }
+    )
+    sincronizar(completo=False)
+    assert db.session.scalars(select(CdDespesa).where(CdDespesa.origem_id == 50)).one()
+
+
+def test_contrato_apagado_na_receita_leva_as_despesas(origens, db):
+    sincronizar()
+    origens["cost_centers"] = []
+    sincronizar()
+    assert _contar(db, CdDespesa) == 0
+
+
+def test_contrato_desativado_continua_com_as_despesas(origens, db):
+    origens["cost_centers"][0]["active"] = False
+    sincronizar()
+    assert db.session.scalars(select(RcContrato)).one().ativo is False
+    assert _contar(db, CdDespesa) == 2

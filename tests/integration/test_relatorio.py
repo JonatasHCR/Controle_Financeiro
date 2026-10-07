@@ -36,7 +36,8 @@ def test_pdf_baixa_com_nome_e_auditoria(entrar, leitor, carregado, pdf_falso, db
     assert resposta.mimetype == "application/pdf"
     assert resposta.data.startswith(b"%PDF")
     assert (
-        'filename="relatorio-financeiro_4561_2026-02.pdf"' in resposta.headers["Content-Disposition"]
+        'filename="relatorio-financeiro_4561_2026-02.pdf"'
+        in resposta.headers["Content-Disposition"]
     )
     assert db.session.scalars(select(Auditoria).where(Auditoria.acao == "relatorio.pdf")).one()
 
