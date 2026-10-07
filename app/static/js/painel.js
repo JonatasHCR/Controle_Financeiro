@@ -450,7 +450,9 @@
       '<dl class="campos" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><dt>Cliente</dt><dd style="font-size:13.5px">' + esc(R.cliente) + '</dd></div><div><dt>Coordenador</dt><dd style="font-size:13.5px">' + esc(R.coordenador) + '</dd></div><div><dt>Contratos</dt><dd style="font-size:13.5px">' + esc(R.contratos) + '</dd></div><div><dt>Período</dt><dd style="font-size:13.5px">' + esc(D.meta.periodo) + '</dd></div></dl>' +
       '<div id="pdf-passos"></div><div class="cfg-bar"><span></span><div class="acoes"><button type="button" class="btn" id="pdf-cancel">Cancelar</button><button type="button" class="btn prim" id="pdf-go">Gerar PDF</button></div></div>');
     $('pdf-cancel').addEventListener('click', fecharModal);
+    var pronto = false;
     $('pdf-go').addEventListener('click', function () {
+      if (pronto) { fecharModal(); return; }
       var bt = $('pdf-go'); bt.disabled = true;
       $('pdf-passos').innerHTML = '<ul class="passos"><li class="run"><i></i>Gerando o PDF no servidor (A4 paisagem)…</li></ul>';
       fetch(url, { credentials: 'same-origin' }).then(function (r) {
@@ -462,7 +464,8 @@
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
         $('pdf-passos').innerHTML = '<ul class="passos"><li class="ok"><i>✓</i>Arquivo pronto</li></ul><div class="arq" style="margin-top:12px"><span class="ic">PDF</span><div><b>' + esc(x.nome) + '</b><div class="note">A4 paisagem · o download começou</div></div></div>';
         $('pdf-cancel').hidden = true;
-        bt.textContent = 'Fechar'; bt.disabled = false; bt.onclick = fecharModal;
+        pronto = true;
+        bt.textContent = 'Fechar'; bt.disabled = false;
       }).catch(function (e) {
         $('pdf-passos').innerHTML = '<div class="aviso">' + esc(e.message) + '</div>'; bt.disabled = false;
       });

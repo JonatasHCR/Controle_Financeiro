@@ -309,6 +309,12 @@ body.pre .card{break-inside:avoid}
   .cab-rel{display:flex}
   body{print-color-adjust:exact;-webkit-print-color-adjust:exact;font-size:11px}
   .card{break-inside:avoid}
+  /* tabela longa (NFs, aditivos) sai inteira, quebrando entre páginas */
+  .tbl-wrap{max-height:none!important;overflow:visible!important}
+  .card.longo{break-inside:auto}
+  thead{display:table-header-group}
+  tfoot{display:table-footer-group}
+  tr{break-inside:avoid}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
@@ -335,7 +341,7 @@ a.cfg-item{text-decoration:none}
 body.impressao .app{box-shadow:none;margin:0;max-width:none}
 /* ficha com muitos contratos: rola na tela, sai inteira no relatório */
 .ficha .tbl-wrap{max-height:360px}
-body.pre .ficha .tbl-wrap{max-height:none}
+body.pre .tbl-wrap{max-height:none;overflow:visible}
 .ficha.multi{grid-template-columns:minmax(0,1fr)}
 .ficha.multi .aneis{justify-content:flex-start}
 .cfg-col{position:sticky;top:80px}
