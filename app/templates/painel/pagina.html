@@ -21,7 +21,12 @@
     <div class="campo" id="w-mes" hidden><label class="lbl" for="f-mes" id="l-mes">Mês</label><select id="f-mes"></select></div>
     <div class="campo" id="w-int" hidden><div class="dupla"><div class="campo"><label class="lbl" for="f-de">De</label><input type="date" id="f-de" class="in"></div><div class="campo"><label class="lbl" for="f-ate">Até</label><input type="date" id="f-ate" class="in"></div></div><p class="note">NFs pela data de emissão e despesas pela data de baixa.</p></div>
     <button type="button" class="link" id="bt-limpar">Limpar filtros</button>
-    <div class="legenda-c" id="legenda-c" aria-label="Contratos"></div>
+    <div class="lista-c">
+      <label class="lbl" for="busca-c">Contratos <span class="lista-c-n" id="lista-c-n"></span></label>
+      <input type="search" id="busca-c" class="in" placeholder="Buscar CR, nome, cliente…" autocomplete="off">
+      <div class="legenda-c" id="legenda-c" aria-label="Contratos"></div>
+      <p class="note" id="lista-c-vazia" hidden>Nenhum contrato com esse texto.</p>
+    </div>
   </aside>
 
   <main id="main">

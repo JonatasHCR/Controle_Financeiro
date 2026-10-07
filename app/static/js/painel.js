@@ -150,9 +150,30 @@
     document.querySelectorAll('[data-nf]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.nf === st.nf); });
     var sel = D.contratos.map(function (c) { return c.cr; });
     $('legenda-c').innerHTML = o.contratos.map(function (c) {
-      return '<button type="button" data-cr="' + esc(c.cr) + '" aria-pressed="' + (st.cr.length === 1 && st.cr[0] === c.cr) + '"' + (sel.indexOf(c.cr) >= 0 ? '' : ' data-off') + '><span class="dot" style="background:' + cor(c.cor) + '"></span><span><b>' + esc(c.cr) + '</b> · ' + esc(c.nome) + tagHtml(c) + '</span></button>';
+      var busca = semAcento([c.cr, c.nome, c.cliente].concat(c.coordenadores).join(' '));
+      return '<button type="button" data-cr="' + esc(c.cr) + '" data-busca="' + esc(busca) + '" aria-pressed="' + (st.cr.length === 1 && st.cr[0] === c.cr) + '"' + (sel.indexOf(c.cr) >= 0 ? '' : ' data-off') + '><span class="dot" style="background:' + cor(c.cor) + '"></span><span><b>' + esc(c.cr) + '</b> · ' + esc(c.nome) + tagHtml(c) + '</span></button>';
     }).join('');
+    filtrarLista();
   }
+
+  // A lista guarda o texto da busca entre um redesenho e outro.
+  function filtrarLista() {
+    var termo = semAcento($('busca-c').value.trim());
+    var botoes = $('legenda-c').querySelectorAll('button[data-cr]');
+    var vistos = 0;
+    botoes.forEach(function (b) {
+      b.hidden = !!termo && b.dataset.busca.indexOf(termo) < 0;
+      if (!b.hidden) vistos++;
+    });
+    $('lista-c-n').textContent = termo ? vistos + ' de ' + botoes.length : '(' + botoes.length + ')';
+    $('lista-c-vazia').hidden = vistos > 0;
+  }
+  $('busca-c').addEventListener('input', filtrarLista);
+  $('busca-c').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var unicos = $('legenda-c').querySelectorAll('button[data-cr]:not([hidden])');
+    if (unicos.length === 1) { e.preventDefault(); soContrato(unicos[0].dataset.cr); }
+  });
   $('legenda-c').addEventListener('click', function (e) { var b = e.target.closest('button[data-cr]'); if (b) soContrato(b.dataset.cr); });
   $('f-mes').addEventListener('change', function (e) { st.mes = e.target.value; atualizar(); });
   $('f-de').addEventListener('change', function (e) {

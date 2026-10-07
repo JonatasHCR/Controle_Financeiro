@@ -107,10 +107,14 @@ def _despesas(session, cliente, completo: bool) -> int:
 def _exclusoes(session, cliente) -> int:
     registro = marca(session, FONTE, "despesas")
     total, nova = 0, registro.marca_exclusoes
+    # Folga como nas despesas: uma limpeza longa no Controle grava a hora do
+    # início da transação, mas só aparece no fim.
+    desde = registro.marca_exclusoes - SOBREPOSICAO if registro.marca_exclusoes else None
     for pagina, watermark in cliente.paginar(
         "despesas/exclusoes",
         "exclusoes",
-        since=registro.marca_exclusoes.isoformat() if registro.marca_exclusoes else None,
+        marca="since",
+        since=desde.isoformat() if desde else None,
     ):
         total += apagar(session, CdDespesa, [x["id"] for x in pagina])
         if watermark:
@@ -125,12 +129,27 @@ def sincronizar(session, cliente, completo: bool = False) -> dict:
     contagens["exclusoes"] = _exclusoes(session, cliente)
     session.flush()
 
-    esperado = cliente.get("status")["despesas"]["count"]
-    local = session.scalar(select(func.count()).select_from(CdDespesa))
-    if local != esperado:
+    status = cliente.get("status")["despesas"]
+    esperado = status["count"]
+    if _contagem(session) != esperado:
         ids = set(cliente.get("despesas/ids")["ids"])
         contagens["reconciliado"] = apagar_ausentes(session, CdDespesa, ids)
         session.flush()
-        if session.scalar(select(func.count()).select_from(CdDespesa)) != esperado:
+        if _contagem(session) != esperado:
             contagens["despesas"] = _despesas(session, cliente, completo=True)
+            session.flush()
+
+    # A quantidade não vê um valor alterado que escapou; a soma vê.
+    soma = status.get("sum_valor_baixado")
+    if soma is not None and _soma(session) != Decimal(str(soma)):
+        contagens["despesas"] = _despesas(session, cliente, completo=True)
+        contagens["reconciliado_soma"] = True
     return contagens
+
+
+def _contagem(session) -> int:
+    return session.scalar(select(func.count()).select_from(CdDespesa))
+
+
+def _soma(session) -> Decimal:
+    return Decimal(str(session.scalar(select(func.coalesce(func.sum(CdDespesa.valor_baixado), 0)))))

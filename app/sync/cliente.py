@@ -35,14 +35,29 @@ class ClienteApi:
         return resposta.json()
 
     def paginar(
-        self, caminho: str, chave: str, limite: int = 1000, **params
+        self, caminho: str, chave: str, limite: int = 1000, marca: str = "updated_since", **params
     ) -> Iterator[list[dict]]:
-        """Página a página até has_more=false. Devolve também a marca d'água da última."""
-        offset = 0
+        """Página a página até has_more=false. Devolve também a marca d'água da última.
+
+        Com `last_id` na resposta, a próxima página parte da última linha lida
+        (`marca` + `after_id`); sem ele, cai no offset. Página repetida é erro:
+        sem essa trava, uma API que ignora a paginação prende o sync num laço.
+        """
+        offset, cursor, anterior = 0, None, None
         while True:
-            corpo = self.get(caminho, limit=limite, offset=offset, **params)
+            consulta = {**params, **cursor} if cursor else {**params, "offset": offset}
+            corpo = self.get(caminho, limit=limite, **consulta)
             itens = corpo.get(chave, [])
             yield itens, corpo.get("watermark")
             if not corpo.get("has_more") or not itens:
                 return
-            offset += len(itens)
+
+            assinatura = (corpo.get("watermark"), corpo.get("last_id"), len(itens), str(itens[-1]))
+            if assinatura == anterior:
+                raise ErroDeSync(f"{caminho}: a API devolveu a mesma página de novo")
+            anterior = assinatura
+
+            if corpo.get("last_id") is not None and corpo.get("watermark"):
+                cursor = {marca: corpo["watermark"], "after_id": corpo["last_id"]}
+            else:
+                offset += len(itens)
