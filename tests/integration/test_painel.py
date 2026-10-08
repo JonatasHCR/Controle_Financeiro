@@ -302,3 +302,16 @@ def test_impressao_respeita_nfs_nao_pagas_e_agrupamento(entrar, leitor, carregad
     import re
 
     assert re.search(r'"nf":\s*"open"', corpo) and re.search(r'"agrupar":\s*"coord"', corpo)
+
+
+def test_percentual_dos_tributos_mantem_as_casas(carregado, db):
+    from decimal import Decimal
+
+    from app.models import Parametros
+
+    db.session.add(Parametros(cr_norm="*", tributos=Decimal("0.1188"), taxa_adm=Decimal("0.125")))
+    db.session.commit()
+    assert painel(carregado)["cascata"]["tributos_txt"] == "11,88%"
+    db.session.get(Parametros, "*").tributos = Decimal("0.2")
+    db.session.commit()
+    assert painel(carregado)["cascata"]["tributos_txt"] == "20%"

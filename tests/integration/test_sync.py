@@ -341,11 +341,17 @@ def test_incremental_pede_desde_a_marca(origens, db):
     assert pedidos_nf and all("updated_since" in u for u in pedidos_nf)
 
 
-def test_sincronizar_agora_so_admin(origens, entrar, admin, operador, db):
-    assert entrar(operador).post("/administracao/sincronizar").status_code == 403
-    resposta = entrar(admin).post("/administracao/sincronizar")
+def test_sincronizar_agora_operador_e_admin(origens, entrar, admin, operador, leitor, db):
+    assert entrar(leitor).post("/administracao/sincronizar").status_code == 403
+    resposta = entrar(operador).post("/administracao/sincronizar")
     assert resposta.status_code == 302
     assert db.session.scalars(select(SyncExecucao)).one().disparo == "manual"
+    assert entrar(admin).post("/administracao/sincronizar").status_code == 302
+
+
+def test_botao_sincronizar_aparece_para_operador(origens, entrar, operador, leitor):
+    assert "Sincronizar</button>" in entrar(operador).get("/").get_data(as_text=True)
+    assert "Sincronizar</button>" not in entrar(leitor).get("/").get_data(as_text=True)
 
 
 def test_valor_alterado_sem_mudar_a_marca_e_pego_pela_soma(origens, db):

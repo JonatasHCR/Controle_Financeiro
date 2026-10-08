@@ -55,12 +55,12 @@ class Usuario(db.Model):
 
     @property
     def pode_escrever(self) -> bool:
-        """Manter a configuracao dos contratos (complementos)."""
+        """Manter a configuracao dos contratos (complementos) e sincronizar agora."""
         return self.ativo and self.nivel >= PERFIS.index("operador")
 
     @property
     def pode_administrar(self) -> bool:
-        """Painel adm, backup, restauracao, sincronizacao e auditoria."""
+        """Painel adm, backup, restauracao e auditoria."""
         return self.ativo and self.nivel >= PERFIS.index("admin")
 
     def __repr__(self) -> str:

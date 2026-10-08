@@ -1,4 +1,5 @@
-"""Painel administrativo: backups, restauracao, sincronizacao e perfis. Só admin."""
+"""Painel administrativo: backups, restauracao, sincronizacao e perfis. Só admin,
+menos o "Sincronizar agora", que o operador também pode disparar."""
 
 from __future__ import annotations
 
@@ -134,7 +135,7 @@ def mudar_perfil(identificador: int):
 
 
 @bp.post("/sincronizar")
-@requer("admin")
+@requer("operador")
 @limiter.limit("6 per minute")
 def sincronizar():
     usuario = usuario_atual()
@@ -157,4 +158,4 @@ def sincronizar():
             flash(
                 f"Sincronização terminou com problema: {execucao.erro or execucao.status}", "erro"
             )
-    return redirect(request.referrer or url_for("admin.painel"))
+    return redirect(request.referrer or url_for("painel.pagina"))

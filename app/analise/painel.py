@@ -417,9 +417,11 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
     }
 
 
-def _pct_param(valores: set[float], casas: int = 0) -> str:
+def _pct_param(valores: set[float]) -> str:
+    """Até duas casas, sem zeros à direita: 20%, 12,5%, 11,88%."""
     if len(valores) == 1:
-        return f"{next(iter(valores)) * 100:.{casas}f}%".replace(".", ",")
+        texto = f"{next(iter(valores)) * 100:.2f}".rstrip("0").rstrip(".")
+        return texto.replace(".", ",") + "%"
     return "por contrato"
 
 
@@ -518,7 +520,7 @@ def _por_grupo(cs: list[Contrato], agrupar: str, fat_c, cus_c, cred_c) -> dict:
         "titulo": titulo,
         "singular": um,
         "plural": varios,
-        "pis_cofins_txt": _pct_param({c.pis_cofins for c in cs}, casas=2),
+        "pis_cofins_txt": _pct_param({c.pis_cofins for c in cs}),
         "linhas": linhas,
         "total": _somar(list(por_cr.values())),
     }
