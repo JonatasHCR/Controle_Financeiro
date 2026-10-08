@@ -20,6 +20,7 @@ from app.models import (
     CfgBm,
     CfgContrato,
     CfgItem,
+    CfgNaturezaCredito,
     CfgPendencia,
     CfgPleito,
     DeparaItem,
@@ -177,6 +178,8 @@ def base_maxima(session, hoje: date | None = None) -> str:
 class Lancamentos:
     nfs: list[dict]
     custos: list[tuple[str, date, str, float]]  # (cr, data_baixa, item, valor)
+    # Parte dos custos de natureza que gera crédito de PIS/COFINS: (cr, data_baixa, valor)
+    creditos: list[tuple[str, date, float]]
     itens: dict[str, list[CfgItem]]
     pendencias: list[CfgPendencia]
     pleitos: list[CfgPleito]
@@ -222,7 +225,8 @@ def carregar_lancamentos(session, contratos: list[Contrato]) -> Lancamentos:
     for d in session.scalars(select(DeparaItem).where(DeparaItem.cr_norm.in_(crs))):
         depara[d.cr_norm][d.natureza_nome_norm] = d.item_codigo
 
-    custos = []
+    com_credito = set(session.scalars(select(CfgNaturezaCredito.natureza_nome_norm)))
+    custos, creditos = [], []
     linhas = session.execute(
         select(
             CdCentro.cr_norm,
@@ -240,6 +244,8 @@ def carregar_lancamentos(session, contratos: list[Contrato]) -> Lancamentos:
         # Sem ligação na configuração, o item é a própria natureza.
         item = depara[cr].get(natureza) or PREFIXO_NATUREZA + nome
         custos.append((cr, data_baixa, item, _f(valor)))
+        if natureza in com_credito:
+            creditos.append((cr, data_baixa, _f(valor)))
 
     itens = defaultdict(list)
     for it in session.scalars(
@@ -257,7 +263,7 @@ def carregar_lancamentos(session, contratos: list[Contrato]) -> Lancamentos:
         .where(CfgPleito.cr_norm.in_(crs))
         .order_by(CfgPleito.data_base.desc().nulls_last())
     ).all()
-    return Lancamentos(nfs, custos, itens, list(pendencias), list(pleitos))
+    return Lancamentos(nfs, custos, creditos, itens, list(pendencias), list(pleitos))
 
 
 def nomes_coordenadores(contratos: list[Contrato]) -> list[str]:

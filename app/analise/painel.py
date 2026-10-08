@@ -1,14 +1,17 @@
 """Monta tudo o que a tela, a impressão e o PDF mostram.
 
 Um objeto só (dict serializável), para que os três números batam sempre.
-Fórmulas as do dashboard de fiscalização: líquida = bruta − tributos;
-custo-alvo atual = líquida ÷ (1 + taxa adm.); BDI = (1 + taxa) ÷ (1 − tributos).
+Líquida = bruta − tributos; resultado = líquida − custo realizado. No resumo
+agrupado entram também PIS/COFINS (com crédito das naturezas marcadas) e a
+taxa adm. de cada contrato sobre a bruta.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
+
+from flask import current_app
 
 from app.analise.dados import (
     NAO_CLASSIFICADO,
@@ -27,11 +30,10 @@ from app.analise.periodo import (
     add_meses,
     data_br,
     fim_do_mes,
-    meses_entre,
     rotulo_mes,
     ym,
 )
-from app.models import PERFIS, CfgItem
+from app.models import PERFIS
 
 
 def _passa(contrato: Contrato, filtro: Filtro) -> bool:
@@ -51,6 +53,14 @@ def visiveis_para(contratos: list[Contrato], usuario) -> list[Contrato]:
     meu = nome_norm(usuario.nome)
     meus = [c for c in contratos if meu in {nome_norm(n) for n in c.coordenadores}]
     return meus or contratos
+
+
+# chave do Filtro → (título da coluna, singular, plural)
+AGRUPAR = {
+    "cli": ("Contratante", "contratante", "contratantes"),
+    "coord": ("Coordenador", "coordenador", "coordenadores"),
+    "cr": ("Centro de custo", "centro de custo", "centros de custo"),
+}
 
 
 def rotulos(filtro: Filtro, selecionados: list[Contrato]) -> dict:
@@ -74,6 +84,8 @@ def rotulos(filtro: Filtro, selecionados: list[Contrato]) -> dict:
         "contratos": ", ".join(filtro.crs) if filtro.crs else f"Todos ({len(selecionados)})",
         "titulo": titulo,
         "gestor": gestor,
+        "nf": "Só não pagas" if filtro.nf == "open" else "Todas",
+        "agrupar": AGRUPAR[filtro.agrupar][0],
     }
 
 
@@ -85,63 +97,6 @@ def _tempo(c: Contrato, corte: str) -> float:
         return 1.0
     base = min(fim_do_mes(corte), fim_do_mes(ym(c.horizonte)))
     return max(0.0, min(1.0, (base - c.inicio).days / total))
-
-
-def _ultimo_mes_com_dado(c: Contrato, corte: str) -> str:
-    fim = ym(c.fim_execucao or c.fim_vigencia) if c.receita else None
-    return min(corte, fim) if fim else corte
-
-
-def _item_calc(
-    c: Contrato, itens: list[CfgItem], real_por_item: dict[str, float], corte: str
-) -> list[dict]:
-    """Custo-alvo projetado, custo projetado e desvio de cada item (sempre acumulado)."""
-    k = _ultimo_mes_com_dado(c, corte)
-    inicio = ym(c.inicio) if c.inicio else None
-    meses_corridos = meses_entre(inicio, k) + 1 if inicio else 1
-    meses_restantes = max(0, meses_entre(k, ym(c.horizonte))) if c.horizonte else 0
-    linhas = []
-    codigos = set()
-    for it in itens:
-        codigos.add(it.codigo)
-        real = real_por_item.get(it.codigo, 0.0)
-        alvo = float(it.custo_alvo or 0)
-        alvo_proj = float(it.custo_alvo_projetado) if it.custo_alvo_projetado is not None else alvo
-        ritmo = real / max(1, meses_corridos)
-        proj = real if c.status == "CONCLUÍDO" else real + ritmo * meses_restantes
-        linhas.append(
-            {
-                "cr": c.cr,
-                "codigo": it.codigo,
-                "d": it.descricao,
-                "alvo": alvo,
-                "alvo_u": alvo_proj,
-                "real": real,
-                "proj": proj,
-                "desv": alvo_proj - proj,
-            }
-        )
-    # Natureza sem ligação é item próprio, sem custo-alvo; código de item que
-    # sumiu da configuração aparece com o código, para alguém religar.
-    for cod, real in sorted(real_por_item.items(), key=lambda par: -par[1]):
-        if cod in codigos or not real:
-            continue
-        ritmo = real / max(1, meses_corridos)
-        proj = real if c.status == "CONCLUÍDO" else real + ritmo * meses_restantes
-        linhas.append(
-            {
-                "cr": c.cr,
-                "codigo": cod,
-                "d": nome_do_item(cod),
-                "alvo": 0.0,
-                "alvo_u": 0.0,
-                "real": real,
-                "proj": proj,
-                "desv": -proj,
-                "sem_alvo": True,
-            }
-        )
-    return linhas
 
 
 def nome_do_item(codigo: str) -> str:
@@ -226,6 +181,7 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
             "hoje": hoje.isoformat(),
             "rotulos": rotulos(filtro, cs),
             "meses_base": _meses_base(data_min, periodo.base_max),
+            "estado": {"nf": filtro.nf, "agrupar": filtro.agrupar},
         },
         "opcoes": opcoes(todos, filtro),
         "contratos": [_ficha(c) for c in cs],
@@ -251,19 +207,15 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
     cus = sum(cus_c.values())
     trib = sum(fat_c[c.cr] * c.tributos for c in cs)
     liq = fat - trib
-    alvo_at = sum(fat_c[c.cr] * (1 - c.tributos) / (1 + c.taxa_adm) for c in cs)
     cascata = {
         "valor": valor_total,
         "fat": fat,
         "trib": trib,
         "liq": liq,
-        "tx": liq - alvo_at,
-        "alvo_at": alvo_at,
         "cus": cus,
-        "res": alvo_at - cus,
+        "res": liq - cus,
         "n_nfs": len(nfs_periodo),
         "tributos_txt": _pct_param({c.tributos for c in cs}),
-        "taxa_txt": _pct_param({c.taxa_adm for c in cs}),
         "mes": periodo.modo == "mes",
     }
 
@@ -335,32 +287,6 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
         "destaque": [periodo.mes_no_periodo(m) for m in meses],
     }
 
-    # --- itens, tendência e markup (acumulado até o corte) ------------------------
-    real_acum = defaultdict(lambda: defaultdict(float))
-    real_periodo = defaultdict(float)
-    for cr, data_baixa, item, valor in lanc.custos:
-        if ym(data_baixa) <= _ultimo_mes_com_dado(por_cr[cr], corte):
-            real_acum[cr][item] += valor
-        if periodo.despesa_no_periodo(data_baixa):
-            real_periodo[(cr, item)] += valor
-    calc = {c.cr: _item_calc(c, lanc.itens.get(c.cr, []), real_acum[c.cr], corte) for c in cs}
-    todos_itens = [i for linhas in calc.values() for i in linhas]
-    alvo = sum(i["alvo"] for i in todos_itens)
-    alvo_u = sum(i["alvo_u"] for i in todos_itens)
-    proj = sum(i["proj"] for i in todos_itens)
-    desv = sum(i["desv"] for i in todos_itens)
-    rec_proj = sum(i["alvo_u"] * por_cr[i["cr"]].bdi for i in todos_itens)
-    custo_alvo = {
-        "alvo": alvo,
-        "alvo_u": alvo_u,
-        "proj": proj,
-        "desv": desv,
-        "mk_c": valor_total / alvo if alvo else None,
-        "mk_a": fat / cus if cus else None,
-        "mk_f": rec_proj / proj if proj else None,
-        **_serie_resultado(cs, lanc, inicio_geral, corte, desv),
-    }
-
     # --- execução × tempo ------------------------------------------------------------
     fat_ate = defaultdict(float)
     for n in lanc.nfs:
@@ -372,7 +298,6 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
             continue
         fc = fat_ate[c.cr] / c.valor if c.valor else 0.0
         tp = _tempo(c, corte)
-        rp = sum(i["alvo_u"] for i in calc[c.cr]) * c.bdi
         classe, texto = _ritmo(fc - tp)
         execucao.append(
             {
@@ -384,16 +309,18 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
                 "fc": fc,
                 "tp": tp,
                 "gap": fc - tp,
-                "cov": rp / c.valor if c.valor else 0.0,
-                "rp": rp,
                 "classe": classe,
                 "texto": texto,
                 "despesa": c.despesa,
             }
         )
 
-    # --- custo e desvio por item -------------------------------------------------------
-    nomes_item = {(i["cr"], i["codigo"]): i["d"] for i in todos_itens}
+    # --- custo por item ------------------------------------------------------------------
+    real_periodo = defaultdict(float)
+    for cr, data_baixa, item, valor in lanc.custos:
+        if periodo.despesa_no_periodo(data_baixa):
+            real_periodo[(cr, item)] += valor
+    nomes_item = {(cr, it.codigo): it.descricao for cr, its in lanc.itens.items() for it in its}
     itens_periodo = sorted(
         (
             {
@@ -407,20 +334,8 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
         ),
         key=lambda x: -x["v"],
     )[:10]
-    desvios = sorted(
-        # Item sem custo-alvo (natureza sem ligação) não tem desvio a comparar.
-        (i for i in todos_itens if abs(i["desv"]) > 0.5 and not i.get("sem_alvo")),
-        key=lambda i: -abs(i["desv"]),
-    )[:10]
-    desvios.sort(key=lambda i: -i["desv"])
 
-    # --- prazos, pendências, pleitos, NFs ------------------------------------------------
-    prazos = [
-        _ficha(c)
-        for c in sorted(
-            (c for c in cs if c.inicio and c.fim_execucao), key=lambda c: c.fim_execucao
-        )
-    ]
+    # --- pendências, pleitos, NFs --------------------------------------------------------
     pendencias = [
         {
             "cr": p.cr_norm,
@@ -446,7 +361,11 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
     ]
     potencial = sum(p["valor"] for p in pleitos)
     aprovado = sum(p["valor"] for p in pleitos if p["status"] in ("VALIDADO", "FEITO"))
-    lista_nfs = sorted(nfs_periodo, key=lambda n: (n["competencia"], n["numero"]), reverse=True)
+    lista_nfs = sorted(
+        (n for n in nfs_periodo if filtro.nf == "all" or not n["paga"]),
+        key=lambda n: (n["competencia"], n["numero"]),
+        reverse=True,
+    )
 
     return {
         **base,
@@ -470,17 +389,10 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
         "cascata": cascata,
         "recebimento": recebimento,
         "mensal": mensal,
-        "custo_alvo": custo_alvo,
+        "por_grupo": _por_grupo(cs, filtro.agrupar, fat_c, cus_c, _creditos(lanc, periodo)),
         "execucao": execucao,
         "sem_receita": [c.cr for c in cs if not c.receita],
         "itens": itens_periodo,
-        "desvios": desvios,
-        "prazos": prazos,
-        "riscos": [
-            {"cr": c.cr, "dias": (c.fim_execucao - c.fim_vigencia).days}
-            for c in cs
-            if c.fim_vigencia and c.fim_execucao and c.fim_vigencia < c.fim_execucao
-        ],
         "pendencias": pendencias,
         "pleitos": {"lista": pleitos, "potencial": potencial, "aprovado": aprovado},
         "nfs": {
@@ -498,6 +410,7 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
                 }
                 for n in lista_nfs
             ],
+            "so_abertas": filtro.nf == "open",
             "a_receber": aberto,
             "n_a_receber": sum(1 for n in nfs_periodo if not n["paga"]),
             "pago": pago,
@@ -530,35 +443,6 @@ def _primeiro_mes_custo(lanc) -> str | None:
     return ym(min(datas)) if datas else None
 
 
-def _serie_resultado(cs, lanc, inicio: str, corte: str, final: float) -> dict:
-    """Resultado acumulado mês a mês (NFs ÷ BDI − custo) e tendência linear até o horizonte."""
-    bdi = {c.cr: c.bdi for c in cs}
-    meses = _intervalo_meses(inicio, corte)
-    alvo_mes = defaultdict(float)
-    for n in lanc.nfs:
-        alvo_mes[n["competencia"]] += n["valor"] / bdi[n["cr"]]
-    cus_mes = defaultdict(float)
-    for _cr, d, _i, v in lanc.custos:
-        cus_mes[ym(d)] += v
-    atual, acum = [], 0.0
-    for m in meses:
-        acum += alvo_mes[m] - cus_mes[m]
-        atual.append(acum)
-    horizontes = sorted(ym(c.horizonte) for c in cs if c.horizonte)
-    fim = horizontes[-1] if horizontes else corte
-    futuros = _intervalo_meses(add_meses(corte, 1), fim) if fim > corte else []
-    ultimo = atual[-1] if atual else 0.0
-    tendencia = [ultimo + (final - ultimo) * (i + 1) / len(futuros) for i in range(len(futuros))]
-    com_h = [c for c in cs if c.horizonte]
-    return {
-        "res_rotulos": [rotulo_mes(m) for m in meses + futuros],
-        "res_atual": atual,
-        "res_tendencia": tendencia,
-        "horizontes": [{"cr": c.cr, "mes": rotulo_mes(ym(c.horizonte))} for c in com_h],
-        "horizonte_final": rotulo_mes(fim),
-    }
-
-
 def _tempo_txt(cs: list[Contrato], corte: str) -> str:
     if len(cs) != 1:
         return "média ponderada pelo valor"
@@ -567,3 +451,77 @@ def _tempo_txt(cs: list[Contrato], corte: str) -> str:
         return "sem prazos na Receita"
     base = min(fim_do_mes(corte), c.horizonte)
     return f"{(base - c.inicio).days} de {(c.horizonte - c.inicio).days} dias até o horizonte"
+
+
+def _creditos(lanc, periodo: Periodo) -> dict[str, float]:
+    base = defaultdict(float)
+    for cr, data_baixa, valor in lanc.creditos:
+        if periodo.despesa_no_periodo(data_baixa):
+            base[cr] += valor
+    return base
+
+
+def _valores(c: Contrato, fat: float, cus: float, credito: float, aliquota: float) -> dict:
+    liq = fat * (1 - c.tributos)
+    pis = aliquota * (fat - credito)
+    adm = c.taxa_adm * fat
+    return {
+        "bruta": fat,
+        "liq": liq,
+        "desp": cus,
+        "pis": pis,
+        "adm": adm,
+        "res": liq - cus - pis - adm,
+    }
+
+
+def _somar(linhas: list[dict]) -> dict:
+    return {k: sum(x[k] for x in linhas) for k in ("bruta", "liq", "desp", "pis", "adm", "res")}
+
+
+def _por_grupo(cs: list[Contrato], agrupar: str, fat_c, cus_c, cred_c) -> dict:
+    """Resumo agrupado. Contrato com dois coordenadores entra nos dois grupos;
+    o total conta cada contrato uma vez."""
+    aliquota = float(current_app.config.get("PIS_COFINS", 0.0925))
+    por_cr = {
+        c.cr: {
+            "cr": c.cr,
+            "nome": c.nome,
+            "cor": c.cor,
+            "cliente": c.cliente,
+            "coordenadores": c.coordenadores,
+            "taxa": c.taxa_adm,
+            **_valores(c, fat_c[c.cr], cus_c[c.cr], cred_c[c.cr], aliquota),
+        }
+        for c in cs
+    }
+    grupos = defaultdict(list)
+    for c in cs:
+        if agrupar == "cli":
+            chaves = [c.cliente]
+        elif agrupar == "coord":
+            chaves = c.coordenadores or ["Sem coordenador"]
+        else:
+            chaves = [f"{c.cr} · {c.nome}"]
+        for k in chaves:
+            grupos[k].append(por_cr[c.cr])
+    linhas = [
+        {
+            "nome": k,
+            "taxas": sorted({x["taxa"] for x in membros}),
+            "contratos": membros,
+            **_somar(membros),
+        }
+        for k, membros in grupos.items()
+    ]
+    linhas.sort(key=lambda g: (-g["bruta"], g["res"]))
+    titulo, um, varios = AGRUPAR[agrupar]
+    return {
+        "agrupar": agrupar,
+        "titulo": titulo,
+        "singular": um,
+        "plural": varios,
+        "pis_cofins": aliquota,
+        "linhas": linhas,
+        "total": _somar(list(por_cr.values())),
+    }

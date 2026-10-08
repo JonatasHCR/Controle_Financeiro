@@ -1,7 +1,7 @@
 <div class="cfg-bar"><span class="note">Por padrão, cada natureza do Controle de Despesa é um item com o próprio nome. Para juntar ou renomear, ligue a natureza a um item do contrato; várias naturezas podem ir para o mesmo item. <b>{{ (cobertura * 100) | round(1) | numero_br }}%</b> do custo está ligado a itens cadastrados.</span></div>
 {% if not itens %}<div class="aviso">Para ligar naturezas, cadastre antes os itens do contrato na aba Itens. Enquanto isso, o painel mostra cada natureza como item.</div>{% endif %}
 <div class="tbl-wrap" style="max-height:520px"><table>
-  <thead><tr><th>Natureza (Controle de Despesa)</th><th class="r">Custo realizado</th><th>Item do contrato</th></tr></thead>
+  <thead><tr><th>Natureza (Controle de Despesa)</th><th class="r">Custo realizado</th><th>Item do contrato</th><th title="Vale para todos os contratos">Gera crédito PIS/COFINS</th></tr></thead>
   <tbody>
     {% for n in naturezas %}
       <tr>
@@ -14,11 +14,13 @@
           </select>
           {% if not n.item and n.sugestao %}<span class="pill info" title="Item de descrição mais parecida">sugestão: {{ n.sugestao }}</span>{% endif %}
         </td>
+        <td><label class="cid"><input type="checkbox" name="dp-{{ loop.index0 }}-credito" value="1" {% if n.credito %}checked{% endif %} aria-label="{{ n.nome }} gera crédito de PIS/COFINS"> sim</label></td>
       </tr>
     {% else %}
-      <tr><td colspan="3" class="empty">Nenhuma despesa deste CR no Controle de Despesa.</td></tr>
+      <tr><td colspan="4" class="empty">Nenhuma despesa deste CR no Controle de Despesa.</td></tr>
     {% endfor %}
   </tbody>
 </table></div>
+<p class="note">A marcação “gera crédito PIS/COFINS” vale para a natureza em todos os contratos: o resumo do painel desconta da base de PIS/COFINS o custo dessas naturezas.</p>
 <p class="note">A sugestão vem da semelhança entre o nome da natureza e a descrição do item; ela só vale depois de escolhida e salva.</p>
 <div class="cfg-bar"><span></span><button type="submit" class="btn prim" {% if not naturezas %}disabled{% endif %}>Salvar de-para</button></div>
