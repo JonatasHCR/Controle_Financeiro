@@ -143,6 +143,49 @@ def salvar_parametros(
     return Contagem(novas=0 if atual else 1, alteradas=1 if atual else 0)
 
 
+def aplicar_parametros(
+    session,
+    contratos: list,
+    tributos: Decimal | None,
+    taxa: Decimal | None,
+    pis_cofins: Decimal | None,
+    usuario_id: int | None,
+    globais: tuple[float, float, float] | None = None,
+) -> Contagem:
+    """Grava valores próprios em cada contrato; campo vazio fica como está.
+    Com `globais`, grava também a linha '*' (padrão de quem não tem valor próprio)."""
+    if tributos is None and taxa is None and pis_cofins is None:
+        raise ValueError("preencha pelo menos um percentual")
+    total = Contagem()
+    if globais is not None:
+        total = total.somar(
+            salvar_parametros(
+                session,
+                "*",
+                tributos if tributos is not None else _dec(globais[0]),
+                taxa if taxa is not None else _dec(globais[1]),
+                usuario_id,
+                pis_cofins=pis_cofins if pis_cofins is not None else _dec(globais[2]),
+            )
+        )
+    for c in contratos:
+        total = total.somar(
+            salvar_parametros(
+                session,
+                c.cr,
+                tributos if tributos is not None else _dec(c.tributos),
+                taxa if taxa is not None else _dec(c.taxa_adm),
+                usuario_id,
+                pis_cofins=pis_cofins,
+            )
+        )
+    return total
+
+
+def _dec(valor: float) -> Decimal:
+    return Decimal(str(round(valor, 4)))
+
+
 # --- itens -----------------------------------------------------------------------
 
 CAMPOS_ITEM = (

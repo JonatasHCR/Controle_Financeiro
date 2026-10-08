@@ -85,23 +85,33 @@ def _f(valor) -> float:
     return float(valor) if isinstance(valor, Decimal | int | float) else 0.0
 
 
-def _parametros(session) -> dict[str, tuple[float, float, float]]:
+def parametros_globais(session) -> tuple[float, float, float]:
+    """Tributos, taxa adm. e PIS/COFINS de quem não tem valor próprio: a linha '*'
+    da Configuração ou, sem ela, o padrão do código."""
     cfg = current_app.config
-    pis = float(cfg.get("PIS_COFINS_PADRAO", 0.0925))
     padrao = (
         float(cfg.get("TRIBUTOS_PADRAO", 0.20)),
         float(cfg.get("TAXA_ADM_PADRAO", 0.15)),
-        pis,
+        float(cfg.get("PIS_COFINS_PADRAO", 0.0925)),
     )
+    p = session.get(Parametros, "*")
+    if p is None:
+        return padrao
+    pis = float(p.pis_cofins) if p.pis_cofins is not None else padrao[2]
+    return (float(p.tributos), float(p.taxa_adm), pis)
+
+
+def _parametros(session) -> dict[str, tuple[float, float, float]]:
+    globais = parametros_globais(session)
     linhas = {
         p.cr_norm: (
             float(p.tributos),
             float(p.taxa_adm),
-            float(p.pis_cofins) if p.pis_cofins is not None else pis,
+            float(p.pis_cofins) if p.pis_cofins is not None else globais[2],
         )
-        for p in session.scalars(select(Parametros))
+        for p in session.scalars(select(Parametros).where(Parametros.cr_norm != "*"))
     }
-    linhas.setdefault("*", padrao)
+    linhas["*"] = globais
     return linhas
 
 

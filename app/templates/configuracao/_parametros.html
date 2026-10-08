@@ -5,7 +5,7 @@
   <label>BDI resultante<span class="ro">{{ contrato.bdi | numero_br(4) }}</span></label>
 </div>
 <p class="note">{% if parametros %}Este contrato usa valores próprios.{% else %}Este contrato usa o padrão global.{% endif %}
-  Altere só quando o contrato for diferente do padrão (tributos {{ (config.TRIBUTOS_PADRAO | float * 100) | round | int }}%, taxa adm. {{ (config.TAXA_ADM_PADRAO | float * 100) | round | int }}% e PIS/COFINS {{ (config.PIS_COFINS_PADRAO | float * 100) | numero_br }}%). O PIS/COFINS entra só no resumo por contratante do painel.</p>
+  Altere só quando o contrato for diferente do padrão (tributos {{ (globais[0] * 100) | numero_br }}%, taxa adm. {{ (globais[1] * 100) | numero_br }}% e PIS/COFINS {{ (globais[2] * 100) | numero_br }}%, em <a href="{{ url_for('configuracao.globais') }}">Parâmetros globais</a>). O PIS/COFINS entra só no resumo por contratante do painel.</p>
 <div class="cfg-bar">
   <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="padrao"> Voltar ao padrão global</label>
   <button type="submit" class="btn prim">Salvar parâmetros</button>

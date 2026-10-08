@@ -379,3 +379,18 @@ body.pre #tb-grupo .taxa{display:block;margin:0}
 body.pre #tb-grupo .cid{white-space:normal}
 body.pre #tb-grupo tr.filho td:first-child{padding-left:16px}
 body.pre .seg-in button[aria-pressed=false]{display:none}
+
+/* parâmetros em lote */
+#f-lote{display:flex;flex-direction:column;gap:12px}
+.lote-alvo{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.seg-r{display:inline-flex;flex-wrap:wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:2px;width:fit-content}
+.seg-r label{cursor:pointer}
+.seg-r input{position:absolute;opacity:0;pointer-events:none}
+.seg-r span{display:block;font-size:12.5px;color:var(--ink-2);padding:5px 12px;border-radius:5px}
+.seg-r input:checked+span{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.seg-r input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.lote-sel{display:flex;flex-direction:column;gap:6px;max-width:520px}
+.lote-lista{display:flex;flex-direction:column;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px}
+.lote-lista label{display:flex;gap:8px;align-items:center;padding:5px 8px;border-radius:6px;font-size:13px;cursor:pointer}
+.lote-lista label:hover{background:var(--surface-2)}
+.lote-lista input{accent-color:var(--accent)}
