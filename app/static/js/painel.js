@@ -13,6 +13,7 @@
   var nf0 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
   var nf1 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   var nf2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var nfAte2 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
   function brl(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
   function brlC(v) {
     var s = v < 0 ? '−' : '', a = Math.abs(v);
@@ -306,8 +307,8 @@
     $('h-grupo').textContent = 'Resumo por ' + G.singular;
     $('sub-grupo').textContent = D.meta.periodo + ' · ' + plural(G.linhas.length, G.singular, G.plural) + ' · ' + plural(D.contratos.length, 'contrato', 'contratos');
     document.querySelectorAll('[data-agrupar]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.agrupar === G.agrupar)); });
-    var taxaTxt = function (t) { return nf0.format(t * 100) + '%'; };
-    var faixa = function (ts) { return ts.length === 1 ? taxaTxt(ts[0]) : nf0.format(ts[0] * 100) + '–' + taxaTxt(ts[ts.length - 1]); };
+    var taxaTxt = function (t) { return nfAte2.format(t * 100) + '%'; };
+    var faixa = function (ts) { return ts.length === 1 ? taxaTxt(ts[0]) : nfAte2.format(ts[0] * 100) + '–' + taxaTxt(ts[ts.length - 1]); };
     var v = function (x) { return '<span class="' + (x < 0 ? 'neg-t' : '') + '">' + brl(x) + '</span>'; };
     var lucro = function (o) {
       if (!o.bruta) return '<span class="note">—</span>';
