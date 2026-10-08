@@ -144,6 +144,8 @@ class Parametros(_Rastro, db.Model):
     cr_norm: Mapped[str] = mapped_column(String(40), primary_key=True)
     tributos: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
     taxa_adm: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    # Vazio = padrão (9,25%).
+    pis_cofins: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
 
 
 class ConfigImportacao(db.Model):

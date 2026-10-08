@@ -248,6 +248,26 @@ def test_credito_de_pis_cofins_so_das_naturezas_marcadas(carregado, db):
     assert c4561["pis"] == pytest.approx(0.0925 * (300_000 - 10_000))
 
 
+def test_pis_cofins_de_cada_contrato(carregado, db):
+    from decimal import Decimal
+
+    from app.models import Parametros
+
+    db.session.add(
+        Parametros(
+            cr_norm="4561",
+            tributos=Decimal("0.2"),
+            taxa_adm=Decimal("0.15"),
+            pis_cofins=Decimal("0.0365"),
+        )
+    )
+    db.session.commit()
+    g = painel(carregado, agrupar="cr")["por_grupo"]
+    c4561 = next(x for x in g["linhas"] if x["nome"].startswith("4561"))
+    assert c4561["pis"] == pytest.approx(0.0365 * 300_000)
+    assert g["pis_cofins_txt"] == "por contrato"
+
+
 def test_taxa_adm_de_cada_contrato(carregado, db):
     from decimal import Decimal
 

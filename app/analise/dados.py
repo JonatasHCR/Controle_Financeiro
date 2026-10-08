@@ -57,6 +57,7 @@ class Contrato:
     fim_execucao: date | None = None
     tributos: float = 0.20
     taxa_adm: float = 0.15
+    pis_cofins: float = 0.0925
     cor: int = 0
 
     @property
@@ -84,11 +85,20 @@ def _f(valor) -> float:
     return float(valor) if isinstance(valor, Decimal | int | float) else 0.0
 
 
-def _parametros(session) -> dict[str, tuple[float, float]]:
+def _parametros(session) -> dict[str, tuple[float, float, float]]:
     cfg = current_app.config
-    padrao = (float(cfg.get("TRIBUTOS_PADRAO", 0.20)), float(cfg.get("TAXA_ADM_PADRAO", 0.15)))
+    pis = float(cfg.get("PIS_COFINS_PADRAO", 0.0925))
+    padrao = (
+        float(cfg.get("TRIBUTOS_PADRAO", 0.20)),
+        float(cfg.get("TAXA_ADM_PADRAO", 0.15)),
+        pis,
+    )
     linhas = {
-        p.cr_norm: (float(p.tributos), float(p.taxa_adm))
+        p.cr_norm: (
+            float(p.tributos),
+            float(p.taxa_adm),
+            float(p.pis_cofins) if p.pis_cofins is not None else pis,
+        )
         for p in session.scalars(select(Parametros))
     }
     linhas.setdefault("*", padrao)
@@ -120,7 +130,7 @@ def carregar_contratos(session) -> list[Contrato]:
         if rc.cr_norm in vistos:
             continue
         vistos.add(rc.cr_norm)
-        trib, taxa = params.get(rc.cr_norm, params["*"])
+        trib, taxa, pis = params.get(rc.cr_norm, params["*"])
         valor = _f(rc.valor)
         contratos.append(
             Contrato(
@@ -142,6 +152,7 @@ def carregar_contratos(session) -> list[Contrato]:
                 or rc.data_fim,
                 tributos=trib,
                 taxa_adm=taxa,
+                pis_cofins=pis,
             )
         )
     contratos.sort(key=lambda c: (len(c.cr), c.cr))

@@ -172,8 +172,12 @@ def test_pendencias_e_pleitos(entrar, operador, carregado, db):
 
 def test_parametros_e_volta_ao_padrao(entrar, operador, carregado, db):
     cliente = entrar(operador)
-    cliente.post("/configuracao/4561/parametros", data={"tributos": "16,5", "taxa_adm": "10"})
+    cliente.post(
+        "/configuracao/4561/parametros",
+        data={"tributos": "16,5", "taxa_adm": "10", "pis_cofins": "3,65"},
+    )
     assert db.session.get(Parametros, "4561").tributos == Decimal("0.1650")
+    assert db.session.get(Parametros, "4561").pis_cofins == Decimal("0.0365")
     cliente.post("/configuracao/4561/parametros", data={"padrao": "on"})
     assert db.session.get(Parametros, "4561") is None
 
