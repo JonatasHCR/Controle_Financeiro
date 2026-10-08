@@ -11,8 +11,6 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 
-from flask import current_app
-
 from app.analise.dados import (
     NAO_CLASSIFICADO,
     PREFIXO_NATUREZA,
@@ -419,9 +417,9 @@ def montar_painel(session, filtro: Filtro, usuario=None, hoje: date | None = Non
     }
 
 
-def _pct_param(valores: set[float]) -> str:
+def _pct_param(valores: set[float], casas: int = 0) -> str:
     if len(valores) == 1:
-        return f"{next(iter(valores)) * 100:.0f}%".replace(".", ",")
+        return f"{next(iter(valores)) * 100:.{casas}f}%".replace(".", ",")
     return "por contrato"
 
 
@@ -461,9 +459,9 @@ def _creditos(lanc, periodo: Periodo) -> dict[str, float]:
     return base
 
 
-def _valores(c: Contrato, fat: float, cus: float, credito: float, aliquota: float) -> dict:
+def _valores(c: Contrato, fat: float, cus: float, credito: float) -> dict:
     liq = fat * (1 - c.tributos)
-    pis = aliquota * (fat - credito)
+    pis = c.pis_cofins * (fat - credito)
     adm = c.taxa_adm * fat
     return {
         "bruta": fat,
@@ -482,7 +480,6 @@ def _somar(linhas: list[dict]) -> dict:
 def _por_grupo(cs: list[Contrato], agrupar: str, fat_c, cus_c, cred_c) -> dict:
     """Resumo agrupado. Contrato com dois coordenadores entra nos dois grupos;
     o total conta cada contrato uma vez."""
-    aliquota = float(current_app.config.get("PIS_COFINS", 0.0925))
     por_cr = {
         c.cr: {
             "cr": c.cr,
@@ -491,7 +488,7 @@ def _por_grupo(cs: list[Contrato], agrupar: str, fat_c, cus_c, cred_c) -> dict:
             "cliente": c.cliente,
             "coordenadores": c.coordenadores,
             "taxa": c.taxa_adm,
-            **_valores(c, fat_c[c.cr], cus_c[c.cr], cred_c[c.cr], aliquota),
+            **_valores(c, fat_c[c.cr], cus_c[c.cr], cred_c[c.cr]),
         }
         for c in cs
     }
@@ -521,7 +518,7 @@ def _por_grupo(cs: list[Contrato], agrupar: str, fat_c, cus_c, cred_c) -> dict:
         "titulo": titulo,
         "singular": um,
         "plural": varios,
-        "pis_cofins": aliquota,
+        "pis_cofins_txt": _pct_param({c.pis_cofins for c in cs}, casas=2),
         "linhas": linhas,
         "total": _somar(list(por_cr.values())),
     }

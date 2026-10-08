@@ -174,7 +174,8 @@ def _salvar_aba(contrato, aba: str, form, usuario_id: int) -> gravar.Contagem:
             return gravar.salvar_parametros(sessao, cr, None, None, usuario_id)
         tributos = decimal_br(form.get("tributos"), "Tributos", obrigatorio=True) / 100
         taxa = decimal_br(form.get("taxa_adm"), "Taxa adm.", obrigatorio=True) / 100
-        return gravar.salvar_parametros(sessao, cr, tributos, taxa, usuario_id)
+        pis = decimal_br(form.get("pis_cofins"), "PIS/COFINS", obrigatorio=True) / 100
+        return gravar.salvar_parametros(sessao, cr, tributos, taxa, usuario_id, pis_cofins=pis)
     if aba == "itens":
         linhas = []
         for n, linha in enumerate(linhas_do_form(form, "it"), start=1):

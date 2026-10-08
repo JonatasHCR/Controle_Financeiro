@@ -106,9 +106,12 @@ def salvar_parametros(
     taxa: Decimal | None,
     usuario_id: int | None,
     simular: bool = False,
+    pis_cofins: Decimal | None = None,
 ) -> Contagem:
-    """Sem valores = volta ao padrão global."""
+    """Sem valores = volta ao padrão global. PIS/COFINS vazio mantém o que já estava."""
     atual = session.get(Parametros, cr)
+    if pis_cofins is None and atual is not None:
+        pis_cofins = atual.pis_cofins
     if tributos is None and taxa is None:
         if atual is None:
             return Contagem()
@@ -118,17 +121,25 @@ def salvar_parametros(
     for nome, valor in (("tributos", tributos), ("taxa adm.", taxa)):
         if valor is None or not (Decimal("0") <= valor < Decimal("1")):
             raise ValueError(f"{nome}: informe um percentual entre 0 e 99,99")
-    if atual and (_norm(atual.tributos), _norm(atual.taxa_adm)) == (_norm(tributos), _norm(taxa)):
+    if pis_cofins is not None and not (Decimal("0") <= pis_cofins < Decimal("1")):
+        raise ValueError("PIS/COFINS: informe um percentual entre 0 e 99,99")
+    novo = (_norm(tributos), _norm(taxa), _norm(pis_cofins))
+    if atual and (_norm(atual.tributos), _norm(atual.taxa_adm), _norm(atual.pis_cofins)) == novo:
         return Contagem()
     if not simular:
         if atual is None:
             session.add(
                 Parametros(
-                    cr_norm=cr, tributos=tributos, taxa_adm=taxa, atualizado_por_id=usuario_id
+                    cr_norm=cr,
+                    tributos=tributos,
+                    taxa_adm=taxa,
+                    pis_cofins=pis_cofins,
+                    atualizado_por_id=usuario_id,
                 )
             )
         else:
-            atual.tributos, atual.taxa_adm, atual.atualizado_por_id = tributos, taxa, usuario_id
+            atual.tributos, atual.taxa_adm = tributos, taxa
+            atual.pis_cofins, atual.atualizado_por_id = pis_cofins, usuario_id
     return Contagem(novas=0 if atual else 1, alteradas=1 if atual else 0)
 
 

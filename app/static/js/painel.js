@@ -326,7 +326,7 @@
           (porCr ? '' : ' <span class="note" style="font-weight:400">· ' + plural(g.contratos.length, 'contrato', 'contratos') + '</span>') + '</td>' + cels(g, faixa(g.taxas)) + '</tr>' +
           (ab ? g.contratos.map(function (c) { return '<tr class="filho"><td><span class="cid"><span class="dot" style="background:' + cor(c.cor) + '"></span><span>' + det(c) + '</span></span></td>' + cels(c, taxaTxt(c.taxa)) + '</tr>'; }).join('') : '');
       }).join('') + '</tbody><tfoot><tr><td>Total</td>' + cels(G.total, '') + '</tr></tfoot></table>' : '<p class="empty">Nenhum contrato no filtro.</p>';
-    $('nota-grupo').textContent = 'Receita líquida = bruta − tributos retidos na NF. PIS e COFINS = ' + nf2.format(G.pis_cofins * 100) + '% da bruta − crédito sobre as despesas de naturezas marcadas na Configuração. ADM = taxa adm. de cada contrato × bruta. Resultado = líquida − despesas − PIS/COFINS − ADM.' +
+    $('nota-grupo').textContent = 'Receita líquida = bruta − tributos retidos na NF. PIS e COFINS = ' + G.pis_cofins_txt + ' da bruta − crédito sobre as despesas de naturezas marcadas na Configuração. ADM = taxa adm. de cada contrato × bruta. Resultado = líquida − despesas − PIS/COFINS − ADM.' +
       (G.agrupar === 'coord' ? ' Contrato com mais de um coordenador entra em cada grupo; o total conta o contrato uma vez.' : '') + (pre ? '' : ' Clique num grupo para ver os contratos.');
   }
   function alternarGrupo(tr) { ABERTOS[tr.dataset.g] = !ABERTOS[tr.dataset.g]; grupo(); var n = $('tb-grupo').querySelector('tr.grp[data-g="' + CSS.escape(tr.dataset.g) + '"]'); if (n) n.focus(); }
