@@ -18,6 +18,10 @@
   <div class="cfg-grid">
     <aside class="cfg-col">
       <input class="in" type="search" id="cfg-busca" placeholder="Buscar CR, nome ou cliente…" aria-label="Buscar contrato">
+      <a class="cfg-item" href="{{ url_for('configuracao.globais') }}" {% if globais and not contrato %}aria-current="true"{% endif %}>
+        <b>Parâmetros globais</b>
+        <small>Tributos, taxa adm. e PIS/COFINS de todos os contratos</small>
+      </a>
       <div class="cfg-lista" id="cfg-lista">
         {% for s in status %}{% set c = s.contrato %}
           <a class="cfg-item" href="{{ url_for('configuracao.lista', cr=c.cr, aba=aba) }}" {% if contrato and c.cr == contrato.cr %}aria-current="true"{% endif %}>
@@ -61,6 +65,44 @@
       <form method="post" action="{{ url_for('configuracao.salvar', cr=contrato.cr, aba=aba) }}">
         {{ form_csrf() }}
         {% include 'configuracao/_' ~ aba ~ '.html' %}
+      </form>
+    </section>
+    {% elif globais %}
+    <section class="card cfg-main">
+      <div class="cfg-bar"><div><h2 style="font-size:17px">Parâmetros globais</h2>
+        <p class="sub">Tributos, taxa adm. e PIS/COFINS de vários contratos de uma vez. O painel e o PDF passam a usar os novos valores assim que forem salvos.</p></div></div>
+      <form method="post" action="{{ url_for('configuracao.globais') }}" id="f-lote">
+        {{ form_csrf() }}
+        <fieldset class="lote-alvo"><legend class="lbl">Aplicar em</legend>
+          <div class="seg-r">
+            {% for valor, rotulo in [('todos', 'Todos os contratos'), ('cr', 'Centros de custo'), ('cli', 'Clientes'), ('coord', 'Coordenadores')] %}
+              <label><input type="radio" name="alvo" value="{{ valor }}" {% if loop.first %}checked{% endif %}><span>{{ rotulo }}</span></label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div data-alvo="todos">
+          <p class="note">Vira o padrão de todos os contratos sem valores próprios.</p>
+          {% if crs_proprios %}<label class="note" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" name="sobrescrever" value="1"> Também substituir {{ 'no contrato' if crs_proprios | length == 1 else 'nos ' ~ (crs_proprios | length) ~ ' contratos' }} com valores próprios ({{ crs_proprios | join(', ') }})</label>{% endif %}
+        </div>
+        {% for chave, rotulo in [('cr', 'centros de custo'), ('cli', 'clientes'), ('coord', 'coordenadores')] %}
+          <div class="lote-sel" data-alvo="{{ chave }}" hidden>
+            <input class="in" type="search" placeholder="Buscar {{ rotulo }}…" aria-label="Buscar {{ rotulo }}">
+            <div class="lote-lista">
+              {% for valor, texto in opcoes_alvo[chave] %}
+                <label><input type="checkbox" name="sel" value="{{ valor }}" disabled> {{ texto }}</label>
+              {% else %}<p class="empty">Nenhum item.</p>{% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+        <div class="form">
+          <label>Tributos da NF (%)<input class="in" name="tributos" inputmode="decimal" placeholder="{{ (globais[0] * 100) | numero_br }}"></label>
+          <label>Taxa adm. UFC (%)<input class="in" name="taxa_adm" inputmode="decimal" placeholder="{{ (globais[1] * 100) | numero_br }}"></label>
+          <label>PIS/COFINS (%)<input class="in" name="pis_cofins" inputmode="decimal" placeholder="{{ (globais[2] * 100) | numero_br }}"></label>
+        </div>
+        <p class="note">Campo em branco fica como está. Globais atuais: tributos {{ (globais[0] * 100) | numero_br }}%, taxa adm. {{ (globais[1] * 100) | numero_br }}%, PIS/COFINS {{ (globais[2] * 100) | numero_br }}%.</p>
+        <div class="aviso" id="lote-afeta" aria-live="polite"></div>
+        <div class="cfg-bar"><span></span><button type="submit" class="btn prim">Aplicar</button></div>
+        <script type="application/json" id="lote-contratos">{{ contratos_lote | tojson }}</script>
       </form>
     </section>
     {% endif %}

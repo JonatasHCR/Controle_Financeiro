@@ -261,3 +261,21 @@ def _cobertura_depara(session) -> dict[str, float]:
 
 def alvo_contratual(c: Contrato) -> float:
     return c.valor * (1 - c.tributos) / (1 + c.taxa_adm) if c.valor else 0.0
+
+
+# --- parâmetros em lote ------------------------------------------------------------
+
+ALVOS = ("todos", "cr", "cli", "coord")
+
+
+def contratos_do_alvo(contratos: list[Contrato], alvo: str, selecao: list[str]) -> list[Contrato]:
+    """Contratos que batem com a seleção: centros de custo, clientes ou coordenadores."""
+    if alvo == "todos":
+        return list(contratos)
+    escolhidos = set(selecao)
+    if alvo == "cr":
+        return [c for c in contratos if c.cr in escolhidos]
+    if alvo == "cli":
+        return [c for c in contratos if c.cliente in escolhidos]
+    alvo_norm = {nome_norm(n) for n in escolhidos}
+    return [c for c in contratos if alvo_norm & {nome_norm(n) for n in c.coordenadores}]

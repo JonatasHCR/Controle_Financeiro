@@ -302,3 +302,74 @@ def test_depara_marca_natureza_que_gera_credito(entrar, operador, carregado, db)
     del dados["dp-0-credito"]
     cliente.post("/configuracao/4561/depara", data=dados)
     assert db.session.scalars(select(CfgNaturezaCredito)).all() == []
+
+
+def test_parametros_globais_valem_para_quem_nao_tem_proprio(entrar, operador, carregado, db):
+    from app.analise.dados import carregar_contratos
+
+    cliente = entrar(operador)
+    assert "Aplicar em" in cliente.get("/configuracao/globais").get_data(as_text=True)
+    cliente.post(
+        "/configuracao/4602/parametros",
+        data={"tributos": "20", "taxa_adm": "10", "pis_cofins": "9,25"},
+    )
+    resposta = cliente.post(
+        "/configuracao/globais",
+        data={"alvo": "todos", "tributos": "12", "taxa_adm": "18", "pis_cofins": "3,65"},
+    )
+    assert resposta.status_code == 302
+    assert db.session.get(Parametros, "*").pis_cofins == Decimal("0.0365")
+    por_cr = {c.cr: c for c in carregar_contratos(db.session)}
+    assert (por_cr["4561"].tributos, por_cr["4561"].taxa_adm) == (0.12, 0.18)
+    assert por_cr["4561"].pis_cofins == 0.0365
+    assert (por_cr["4602"].taxa_adm, por_cr["4602"].pis_cofins) == (0.10, 0.0925)
+
+
+def test_global_substitui_os_proprios_quando_pedido(entrar, operador, carregado, db):
+    from app.analise.dados import carregar_contratos
+
+    cliente = entrar(operador)
+    cliente.post(
+        "/configuracao/4602/parametros",
+        data={"tributos": "20", "taxa_adm": "10", "pis_cofins": "9,25"},
+    )
+    cliente.post(
+        "/configuracao/globais", data={"alvo": "todos", "taxa_adm": "18", "sobrescrever": "1"}
+    )
+    por_cr = {c.cr: c for c in carregar_contratos(db.session)}
+    assert por_cr["4602"].taxa_adm == 0.18 and por_cr["4602"].tributos == 0.20
+
+
+def test_aplicar_por_cliente_so_nos_contratos_dele(entrar, operador, carregado, db):
+    from app.analise.dados import carregar_contratos
+
+    cliente = entrar(operador)
+    cliente.post(
+        "/configuracao/globais",
+        data={"alvo": "cli", "sel": "Prefeitura Municipal", "pis_cofins": "3,65"},
+    )
+    por_cr = {c.cr: c for c in carregar_contratos(db.session)}
+    assert por_cr["4602"].pis_cofins == 0.0365 and por_cr["4660"].pis_cofins == 0.0365
+    assert por_cr["4561"].pis_cofins == 0.0925
+    assert por_cr["4602"].taxa_adm == 0.15  # em branco: fica como estava
+    assert db.session.get(Parametros, "*") is None
+
+
+def test_aplicar_por_coordenador_e_por_centro_de_custo(entrar, operador, carregado, db):
+    from app.analise.dados import carregar_contratos
+
+    cliente = entrar(operador)
+    cliente.post(
+        "/configuracao/globais", data={"alvo": "coord", "sel": "Carlos Menezes", "taxa_adm": "12"}
+    )
+    cliente.post("/configuracao/globais", data={"alvo": "cr", "sel": "4660", "tributos": "11"})
+    por_cr = {c.cr: c for c in carregar_contratos(db.session)}
+    assert [por_cr[cr].taxa_adm for cr in ("4561", "4602", "4660")] == [0.12, 0.12, 0.15]
+    assert [por_cr[cr].tributos for cr in ("4561", "4602", "4660")] == [0.20, 0.20, 0.11]
+
+
+def test_aplicar_sem_selecao_nao_salva(entrar, operador, carregado, db):
+    cliente = entrar(operador)
+    cliente.post("/configuracao/globais", data={"alvo": "cli", "taxa_adm": "12"})
+    cliente.post("/configuracao/globais", data={"alvo": "todos"})
+    assert db.session.scalars(select(Parametros)).all() == []

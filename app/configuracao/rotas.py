@@ -15,14 +15,17 @@ from pathlib import Path
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
 from sqlalchemy import select
 
+from app.analise.dados import carregar_contratos, nomes_coordenadores, parametros_globais
 from app.analise.normalizar import cr_norm
 from app.auditoria.servico import registrar
 from app.auth.guardas import requer, usuario_atual
 from app.configuracao import gravar, planilha
 from app.configuracao.servico import (
+    ALVOS,
     ErroDeValidacao,
     alvo_contratual,
     contrato_por_cr,
+    contratos_do_alvo,
     data_br,
     decimal_br,
     linhas_do_form,
@@ -124,8 +127,112 @@ def _dados_da_aba(contrato, aba: str) -> dict:
             ).all()
         }
     if aba == "parametros":
-        return {"parametros": sessao.get(Parametros, cr)}
+        return {"parametros": sessao.get(Parametros, cr), "globais": parametros_globais(sessao)}
     return {}
+
+
+@bp.route("/globais", methods=["GET", "POST"])
+@requer("operador")
+def globais():
+    """Tributos, taxa adm. e PIS/COFINS em lote: todos os contratos (padrão global)
+    ou só os de centros de custo, clientes ou coordenadores escolhidos."""
+    if request.method == "POST":
+        return _aplicar_globais(request.form)
+    contratos = carregar_contratos(db.session)
+    proprios = set(db.session.scalars(select(Parametros.cr_norm).where(Parametros.cr_norm != "*")))
+    return render_template(
+        "configuracao/lista.html",
+        secao="configuracao",
+        status=status_dos_crs(db.session),
+        contrato=None,
+        globais=parametros_globais(db.session),
+        crs_proprios=sorted(proprios),
+        opcoes_alvo={
+            "cr": [(c.cr, f"{c.cr} · {c.nome}") for c in contratos],
+            "cli": [(n, n) for n in sorted({c.cliente for c in contratos})],
+            "coord": [(n, n) for n in nomes_coordenadores(contratos)],
+        },
+        contratos_lote=[
+            {
+                "cr": c.cr,
+                "nome": c.nome,
+                "cliente": c.cliente,
+                "coordenadores": c.coordenadores,
+                "proprio": c.cr in proprios,
+            }
+            for c in contratos
+        ],
+    )
+
+
+def _aplicar_globais(form):
+    usuario = usuario_atual()
+    alvo = form.get("alvo", "todos")
+    selecao = [v for v in form.getlist("sel") if v]
+    try:
+        if alvo not in ALVOS:
+            raise ErroDeValidacao("escolha onde aplicar")
+        if alvo != "todos" and not selecao:
+            raise ErroDeValidacao("marque pelo menos um item da lista")
+        pct = {
+            campo: (v / 100 if (v := decimal_br(form.get(campo), rotulo)) is not None else None)
+            for campo, rotulo in (
+                ("tributos", "Tributos"),
+                ("taxa_adm", "Taxa adm."),
+                ("pis_cofins", "PIS/COFINS"),
+            )
+        }
+        contratos = carregar_contratos(db.session)
+        if alvo == "todos":
+            # quem não tem valor próprio segue o global; os próprios só mudam se pedido
+            alvos = []
+            if form.get("sobrescrever"):
+                proprios = set(
+                    db.session.scalars(select(Parametros.cr_norm).where(Parametros.cr_norm != "*"))
+                )
+                alvos = [c for c in contratos if c.cr in proprios]
+            globais = parametros_globais(db.session)
+        else:
+            alvos = contratos_do_alvo(contratos, alvo, selecao)
+            if not alvos:
+                raise ErroDeValidacao("nenhum contrato com essa seleção")
+            globais = None
+        contagem = gravar.aplicar_parametros(
+            db.session,
+            alvos,
+            pct["tributos"],
+            pct["taxa_adm"],
+            pct["pis_cofins"],
+            usuario.id,
+            globais=globais,
+        )
+    except (ErroDeValidacao, ValueError) as erro:
+        db.session.rollback()
+        flash(f"Nada foi salvo. {erro}", "erro")
+        return redirect(url_for("configuracao.globais"))
+    if contagem.mudou:
+        registrar(
+            db.session,
+            acao="configuracao.parametros_em_lote",
+            usuario=usuario,
+            alvo_tipo="parametros",
+            payload={
+                "alvo": alvo,
+                "selecao": selecao,
+                "contratos": [c.cr for c in alvos],
+                **{k: str(v) for k, v in pct.items() if v is not None},
+                **contagem.como_dict(),
+            },
+        )
+    db.session.commit()
+    if not contagem.mudou:
+        flash("Nada mudou.", "")
+    elif alvo == "todos":
+        extra = f" e em {len(alvos)} contratos com valores próprios" if alvos else ""
+        flash(f"Parâmetros globais salvos{extra}.", "")
+    else:
+        flash(f"Parâmetros aplicados em {len(alvos)} contratos.", "")
+    return redirect(url_for("configuracao.globais"))
 
 
 def _voltar(cr: str, aba: str):
