@@ -17,6 +17,7 @@ from app.models import (
     CdNatureza,
     CfgBm,
     CfgItem,
+    CfgNaturezaCredito,
     CfgPendencia,
     CfgPleito,
     DeparaItem,
@@ -130,6 +131,7 @@ def naturezas_do_cr(session, cr: str) -> list[dict]:
         for d in session.scalars(select(DeparaItem).where(DeparaItem.cr_norm == cr))
     }
     itens = session.scalars(select(CfgItem).where(CfgItem.cr_norm == cr)).all()
+    com_credito = set(session.scalars(select(CfgNaturezaCredito.natureza_nome_norm)))
     resultado = []
     for nome, norm, total in linhas:
         definido = norm in mapa
@@ -140,6 +142,7 @@ def naturezas_do_cr(session, cr: str) -> list[dict]:
                 "total": float(total or 0),
                 "item": mapa.get(norm, ""),
                 "definido": definido,
+                "credito": norm in com_credito,
                 "sugestao": "" if definido else sugerir_item(nome, itens),
             }
         )

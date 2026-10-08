@@ -111,3 +111,10 @@ def test_intervalo_nao_comeca_antes_do_primeiro_dado():
 def test_intervalo_padrao_onze_meses_antes_ate_o_ultimo_dado():
     p = Periodo.resolver(_filtro(modo="intervalo"), "2026-09", date(2020, 1, 1), date(2026, 10, 6))
     assert (p.de, p.ate) == (date(2025, 11, 1), date(2026, 10, 6))
+
+
+def test_filtro_le_nfs_e_agrupamento():
+    f = Filtro.da_query(MultiDict([("nf", "open"), ("agrupar", "coord")]))
+    assert (f.nf, f.agrupar) == ("open", "coord")
+    f = Filtro.da_query(MultiDict([("nf", "x"), ("agrupar", "y")]))
+    assert (f.nf, f.agrupar) == ("all", "cli")

@@ -30,9 +30,9 @@ def test_cascata_todas_as_datas(carregado):
     assert k["fat"] == pytest.approx(350_000)
     assert k["trib"] == pytest.approx(70_000)
     assert k["liq"] == pytest.approx(280_000)
-    assert k["alvo_at"] == pytest.approx(280_000 / 1.15)
     assert k["cus"] == pytest.approx(110_000)
-    assert k["res"] == pytest.approx(280_000 / 1.15 - 110_000)
+    assert k["res"] == pytest.approx(280_000 - 110_000)
+    assert "alvo_at" not in k
 
 
 def test_universo_sao_os_contratos_da_receita(carregado):
@@ -121,22 +121,20 @@ def test_valor_inicial_e_aditivos_da_receita(carregado):
     assert c["aditivos"] == pytest.approx(200_000)
 
 
-def test_itens_e_desvio_usam_o_depara(carregado):
+def test_itens_usam_o_depara(carregado):
     d = painel(carregado, cr="4561")
     nomes = {i["d"]: i["v"] for i in d["itens"]}
     assert nomes == {
         "Engenheiro fiscal (PJ)": pytest.approx(80_000),
         "Veículo locado": pytest.approx(10_000),
     }
-    assert {x["codigo"] for x in d["desvios"]} <= {"1.1", "1.2"}
+    assert "desvios" not in d and "custo_alvo" not in d and "prazos" not in d
 
 
 def test_natureza_sem_ligacao_vira_item_com_o_proprio_nome(carregado):
     d = painel(carregado, cr="4602")
     assert "Não classificado" not in [i["d"] for i in d["itens"]]
     assert all(i["v"] > 0 for i in d["itens"])
-    # sem custo-alvo, não entra no gráfico de desvio
-    assert d["desvios"] == []
 
 
 def test_varias_naturezas_no_mesmo_item_somam(carregado, db):
@@ -156,11 +154,6 @@ def test_pendencias_so_abertas_e_pleitos(carregado):
     assert [p["assunto"] for p in d["pendencias"]] == ["Renovar seguro-garantia"]
     assert d["pleitos"]["potencial"] == pytest.approx(250_000)
     assert d["pleitos"]["aprovado"] == pytest.approx(200_000)
-
-
-def test_markup_contratual(carregado):
-    a = painel(carregado, cr="4561")["custo_alvo"]
-    assert a["mk_c"] == pytest.approx(1_200_000 / 600_000)
 
 
 def test_coordenador_leitor_ve_so_os_proprios(carregado, leitor, db):
@@ -201,3 +194,91 @@ def test_pagina_sem_handler_inline(entrar, leitor, carregado):
 def test_leitor_nao_ve_abas_de_operador_e_admin(entrar, leitor, carregado):
     corpo = entrar(leitor).get("/").get_data(as_text=True)
     assert "/configuracao" not in corpo and "/administracao" not in corpo
+
+
+# --- resumo agrupado ------------------------------------------------------------
+# Padrão: tributos 20%, taxa adm. 15%, PIS/COFINS 9,25%.
+# 4561: bruta 300 mil, líquida 240 mil, custo 90 mil, PIS 27.750, ADM 45 mil → 77.250
+# 4602: bruta 50 mil, líquida 40 mil, custo 20 mil, PIS 4.625, ADM 7.500 → 7.875
+
+
+def test_resumo_por_contratante(carregado):
+    g = painel(carregado)["por_grupo"]
+    assert g["agrupar"] == "cli" and g["titulo"] == "Contratante"
+    linhas = {x["nome"]: x for x in g["linhas"]}
+    assert list(linhas) == ["Companhia de Saneamento", "Prefeitura Municipal"]
+    cia = linhas["Companhia de Saneamento"]
+    assert cia["bruta"] == pytest.approx(300_000)
+    assert cia["liq"] == pytest.approx(240_000)
+    assert cia["desp"] == pytest.approx(90_000)
+    assert cia["pis"] == pytest.approx(27_750)
+    assert cia["adm"] == pytest.approx(45_000)
+    assert cia["res"] == pytest.approx(77_250)
+    assert cia["taxas"] == [pytest.approx(0.15)]
+    pref = linhas["Prefeitura Municipal"]
+    assert [c["cr"] for c in pref["contratos"]] == ["4602", "4660"]
+    assert pref["res"] == pytest.approx(7_875)
+    assert g["total"]["res"] == pytest.approx(77_250 + 7_875)
+
+
+def test_resumo_por_coordenador_conta_o_contrato_uma_vez_no_total(carregado):
+    g = painel(carregado, agrupar="coord")["por_grupo"]
+    linhas = {x["nome"]: [c["cr"] for c in x["contratos"]] for x in g["linhas"]}
+    assert linhas == {"Ana Ribeiro": ["4561", "4660"], "Carlos Menezes": ["4561", "4602"]}
+    assert g["total"]["bruta"] == pytest.approx(350_000)
+
+
+def test_resumo_por_centro_de_custo(carregado):
+    g = painel(carregado, agrupar="cr")["por_grupo"]
+    assert [x["nome"] for x in g["linhas"]] == [
+        "4561 · Sistema adutor",
+        "4602 · Drenagem",
+        "4660 · Orla",
+    ]
+    assert painel(carregado, agrupar="xyz")["por_grupo"]["agrupar"] == "cli"
+
+
+def test_credito_de_pis_cofins_so_das_naturezas_marcadas(carregado, db):
+    from app.models import CfgNaturezaCredito
+
+    db.session.add(CfgNaturezaCredito(natureza_nome_norm="LOCACAO DE VEICULOS"))
+    db.session.commit()
+    g = painel(carregado, agrupar="cr")["por_grupo"]
+    c4561 = next(x for x in g["linhas"] if x["nome"].startswith("4561"))
+    assert c4561["pis"] == pytest.approx(0.0925 * (300_000 - 10_000))
+
+
+def test_taxa_adm_de_cada_contrato(carregado, db):
+    from decimal import Decimal
+
+    from app.models import Parametros
+
+    db.session.add(Parametros(cr_norm="4602", tributos=Decimal("0.2"), taxa_adm=Decimal("0.10")))
+    db.session.commit()
+    pref = next(x for x in painel(carregado)["por_grupo"]["linhas"] if x["nome"].startswith("Pref"))
+    assert pref["adm"] == pytest.approx(5_000)
+    assert pref["taxas"] == [pytest.approx(0.10), pytest.approx(0.15)]
+
+
+# --- NFs não pagas ---------------------------------------------------------------
+
+
+def test_nfs_nao_pagas_filtradas_no_servidor(carregado):
+    d = painel(carregado, nf="open")
+    assert [n["numero"] for n in d["nfs"]["lista"]] == ["703"]
+    assert d["nfs"]["so_abertas"] is True
+    assert d["meta"]["estado"] == {"nf": "open", "agrupar": "cli"}
+    assert d["meta"]["rotulos"]["nf"] == "Só não pagas"
+    assert len(painel(carregado)["nfs"]["lista"]) == 4
+
+
+def test_impressao_respeita_nfs_nao_pagas_e_agrupamento(entrar, leitor, carregado, app):
+    from app.relatorio.rotas import _assinador
+
+    cliente = entrar(leitor)
+    with app.test_request_context():
+        token = _assinador().dumps({"u": leitor.id, "q": "nf=open&agrupar=coord"})
+    corpo = cliente.get(f"/relatorio/impressao?t={token}").get_data(as_text=True)
+    import re
+
+    assert re.search(r'"nf":\s*"open"', corpo) and re.search(r'"agrupar":\s*"coord"', corpo)

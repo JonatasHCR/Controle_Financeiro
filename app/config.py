@@ -74,6 +74,8 @@ class Base:
     # --- Calculo -----------------------------------------------------------
     TRIBUTOS_PADRAO = os.environ.get("TRIBUTOS_PADRAO", "0.20")
     TAXA_ADM_PADRAO = os.environ.get("TAXA_ADM_PADRAO", "0.15")
+    # PIS + COFINS não cumulativos; o crédito usa a mesma alíquota.
+    PIS_COFINS = os.environ.get("PIS_COFINS", "0.0925")
 
     # --- PDF ---------------------------------------------------------------
     # O Chromium do PDF abre a pagina de impressao neste endereco (dentro do

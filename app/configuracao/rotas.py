@@ -187,12 +187,11 @@ def _salvar_aba(contrato, aba: str, form, usuario_id: int) -> gravar.Contagem:
             linhas.append(_item(linha, f"Item {linha['codigo']}"))
         return gravar.substituir_itens(sessao, cr, linhas, usuario_id)
     if aba == "depara":
-        mapa = {
-            linha["natureza"]: linha.get("item", "")
-            for linha in linhas_do_form(form, "dp")
-            if linha.get("natureza")
-        }
-        return gravar.salvar_depara(sessao, cr, mapa, usuario_id)
+        linhas = [linha for linha in linhas_do_form(form, "dp") if linha.get("natureza")]
+        mapa = {linha["natureza"]: linha.get("item", "") for linha in linhas}
+        creditos = {linha["natureza"]: bool(linha.get("credito")) for linha in linhas}
+        contagem = gravar.salvar_depara(sessao, cr, mapa, usuario_id)
+        return contagem.somar(gravar.salvar_creditos(sessao, creditos, usuario_id))
     if aba == "bms":
         linhas = []
         for linha in linhas_do_form(form, "bm"):

@@ -276,3 +276,25 @@ def test_planilha_nao_toca_em_contrato(entrar, operador, carregado, db):
     antes = db.session.scalars(select(RcContrato)).all()
     _importar(entrar(operador), _planilha({"Contrato": [["4561", "x", "31/12/2027", 20, 15]]}))
     assert db.session.scalars(select(RcContrato)).all() == antes
+
+
+def test_depara_marca_natureza_que_gera_credito(entrar, operador, carregado, db):
+    from app.models import CfgNaturezaCredito
+
+    cliente = entrar(operador)
+    dados = {
+        "dp-0-natureza": "LOCACAO DE VEICULOS",
+        "dp-0-item": "1.2",
+        "dp-0-credito": "1",
+        "dp-1-natureza": "HONORARIOS PJ - ENGENHARIA",
+        "dp-1-item": "1.1",
+    }
+    assert cliente.post("/configuracao/4561/depara", data=dados).status_code == 302
+    assert db.session.scalars(select(CfgNaturezaCredito.natureza_nome_norm)).all() == [
+        "LOCACAO DE VEICULOS"
+    ]
+    corpo = cliente.get("/configuracao/?cr=4602&aba=depara").get_data(as_text=True)
+    assert "Gera crédito PIS/COFINS" in corpo
+    del dados["dp-0-credito"]
+    cliente.post("/configuracao/4561/depara", data=dados)
+    assert db.session.scalars(select(CfgNaturezaCredito)).all() == []

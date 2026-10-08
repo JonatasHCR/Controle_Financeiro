@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import date
 
 MODOS = ("todas", "acum", "mes", "intervalo")
+# Resumo agrupado por contratante, coordenador ou centro de custo.
+AGRUPAMENTOS = ("cli", "coord", "cr")
 MESES = ("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")
 
 
@@ -71,6 +73,9 @@ class Filtro:
     mes: str | None = None
     de: date | None = None
     ate: date | None = None
+    # "open" = só NFs não pagas
+    nf: str = "all"
+    agrupar: str = "cli"
 
     @classmethod
     def da_query(cls, args) -> Filtro:
@@ -84,6 +89,8 @@ class Filtro:
             mes=_mes_valido(args.get("mes")),
             de=_data_valida(args.get("de")),
             ate=_data_valida(args.get("ate")),
+            nf="open" if args.get("nf") == "open" else "all",
+            agrupar=args.get("agrupar") if args.get("agrupar") in AGRUPAMENTOS else "cli",
         )
         # a data inicial nunca passa da final (o servidor confere de novo)
         if filtro.de and filtro.ate and filtro.de > filtro.ate:

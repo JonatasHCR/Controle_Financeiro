@@ -89,6 +89,14 @@ class DeparaItem(_Rastro, db.Model):
     __table_args__ = (UniqueConstraint("cr_norm", "natureza_nome_norm"),)
 
 
+class CfgNaturezaCredito(_Rastro, db.Model):
+    """Natureza de despesa que gera crédito de PIS/COFINS. Vale para todos os CRs."""
+
+    __tablename__ = "cfg_naturezas_credito"
+
+    natureza_nome_norm: Mapped[str] = mapped_column(String(200), primary_key=True)
+
+
 class CfgBm(_Rastro, db.Model):
     """Número do boletim de medição de cada NF da Receita."""
 

@@ -13,7 +13,16 @@ from decimal import Decimal
 
 from sqlalchemy import delete, select
 
-from app.models import CfgBm, CfgContrato, CfgItem, CfgPendencia, CfgPleito, DeparaItem, Parametros
+from app.models import (
+    CfgBm,
+    CfgContrato,
+    CfgItem,
+    CfgNaturezaCredito,
+    CfgPendencia,
+    CfgPleito,
+    DeparaItem,
+    Parametros,
+)
 
 
 @dataclass
@@ -200,6 +209,32 @@ def salvar_depara(
             )
         elif atual.item_codigo != item:
             atual.item_codigo, atual.atualizado_por_id = item, usuario_id
+    return contagem
+
+
+def salvar_creditos(
+    session, creditos: dict[str, bool], usuario_id: int | None, simular: bool = False
+) -> Contagem:
+    """creditos: natureza (nome_norm) → gera crédito de PIS/COFINS. Vale para todos os CRs."""
+    marcadas = {
+        c.natureza_nome_norm: c
+        for c in session.scalars(
+            select(CfgNaturezaCredito).where(CfgNaturezaCredito.natureza_nome_norm.in_(creditos))
+        )
+    }
+    contagem = Contagem()
+    for natureza, gera in creditos.items():
+        atual = marcadas.get(natureza)
+        if gera and atual is None:
+            contagem.novas += 1
+            if not simular:
+                session.add(
+                    CfgNaturezaCredito(natureza_nome_norm=natureza, atualizado_por_id=usuario_id)
+                )
+        elif not gera and atual is not None:
+            contagem.removidas += 1
+            if not simular:
+                session.delete(atual)
     return contagem
 
 

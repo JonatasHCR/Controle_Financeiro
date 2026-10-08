@@ -44,6 +44,13 @@
       </div>
     </section>
 
+    <section class="card span-12" id="sec-grupo">
+      <div class="card-head"><div><h2 id="h-grupo">Resumo por contratante</h2><p class="sub" id="sub-grupo"></p></div>
+        <div class="agrupar"><span class="lbl" id="l-agrupar">Agrupar por</span><div class="seg-in" role="group" aria-labelledby="l-agrupar"><button type="button" data-agrupar="cli" aria-pressed="true">Contratante</button><button type="button" data-agrupar="coord" aria-pressed="false">Coordenador</button><button type="button" data-agrupar="cr" aria-pressed="false">Centro de custo</button></div></div></div>
+      <div class="tbl-wrap" id="tb-grupo"></div>
+      <p class="note" id="nota-grupo"></p>
+    </section>
+
     <section class="card span-12">
       <div class="card-head"><div><h2>Recebimento das NFs emitidas</h2><p class="sub" id="sub-receb"></p></div>
         <div class="legend"><span><i class="sw" style="background:var(--paid)"></i>Pago</span><span><i class="sw" style="background:var(--open)"></i>Não pago</span></div></div>
@@ -60,33 +67,13 @@
     </section>
 
     <section class="card span-5">
-      <div class="card-head"><div><h2>Custo-alvo, tendência e markup</h2><p class="sub" id="sub-ct"></p></div></div>
-      <div class="blocos" id="ctiles"></div>
-      <div><div class="card-head" style="margin-bottom:4px"><h3 style="font-size:13px">Resultado atual × final</h3><div class="legend"><span><i class="sw-line"></i>Realizado</span><span><i class="sw-line dash"></i>Tendência</span></div></div>
-        <div class="chart h200"><canvas id="c-res" aria-label="Resultado acumulado e tendência"></canvas></div><p class="note" id="sub-res" style="margin-top:4px"></p></div>
-      <div class="blocos" id="mtiles"></div>
-    </section>
-
-    <section class="card span-5">
-      <div class="card-head"><div><h2>Execução financeira × tempo</h2><p class="sub">Barra = faturado · seta = tempo transcorrido · pontilhado = fim da receita projetada · clique para filtrar</p></div></div>
+      <div class="card-head"><div><h2>Execução financeira × tempo</h2><p class="sub">Barra = faturado · seta = tempo transcorrido · clique para filtrar</p></div></div>
       <div class="prog" id="exec"></div>
     </section>
 
-    <section class="card span-7">
+    <section class="card span-12">
       <div class="card-head"><div><h2>Custo realizado por item</h2><p class="sub">10 maiores itens no período</p></div></div>
       <div class="chart h300"><canvas id="c-itens" aria-label="Custo realizado por item"></canvas></div>
-    </section>
-
-    <section class="card span-6">
-      <div class="card-head"><div><h2>Desvio projetado por item</h2><p class="sub">Custo-alvo projetado − custo total projetado · 10 maiores</p></div>
-        <div class="legend"><span><i class="sw" style="background:var(--pos)"></i>Economia</span><span><i class="sw" style="background:var(--neg)"></i>Estouro</span></div></div>
-      <div class="chart h300"><canvas id="c-desvio" aria-label="Desvio projetado por item"></canvas></div>
-    </section>
-
-    <section class="card span-6">
-      <div class="card-head"><div><h2>Prazos contratuais</h2><p class="sub">Barra = execução · marca = fim da vigência · tracejado = hoje</p></div></div>
-      <div class="chart h280" id="pz-box"><canvas id="c-prazos" aria-label="Prazos dos contratos"></canvas></div>
-      <p class="note" id="pz-risco"></p>
     </section>
 
     <section class="card span-6">
@@ -118,8 +105,8 @@
 
 {% block rodape %}
 <footer>
-  <span>Receita líquida = receita bruta − tributos da NF. Custo-alvo atual = receita líquida ÷ (1 + taxa adm.). Markup contratual = valor do contrato ÷ custo-alvo.</span>
-  <span>Fontes: Gerenciamento de Receita (contratos, NFs, recebimentos, aditivos) e Controle de Despesa (custo realizado). Itens, BMs, prazos de execução, pendências e pleitos vêm da Configuração.</span>
+  <span>Receita líquida = receita bruta − tributos da NF. Resultado = receita líquida − custo realizado.</span>
+  <span>Fontes: Gerenciamento de Receita (contratos, NFs, recebimentos, aditivos) e Controle de Despesa (custo realizado). Itens, BMs, prazos de execução, pendências, pleitos, taxa adm. e naturezas com crédito de PIS/COFINS vêm da Configuração.</span>
 </footer>
 {% endblock %}
 
